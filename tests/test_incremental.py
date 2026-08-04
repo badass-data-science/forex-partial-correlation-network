@@ -2,7 +2,7 @@ import datetime
 
 import pandas as pd
 
-from fx_bn.incremental import merge_incremental
+from fx_pcn.incremental import merge_incremental
 
 
 def test_merge_incremental_keeps_existing_and_appends_only_new_dates():

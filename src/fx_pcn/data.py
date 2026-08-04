@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from fx_bn import config
-from fx_bn.influx_client import DEFAULT_START, query_pair_frame
+from fx_pcn import config
+from fx_pcn.influx_client import DEFAULT_START, query_pair_frame
 
 
 def pair_to_colname(pair: str) -> str:

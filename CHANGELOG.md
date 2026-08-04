@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Graphviz-based PNG rendering of the most recent graph in an edge-table
-  parquet (`fx_bn.render_graph`), force-directed `neato` layout with curved
+  parquet (`fx_pcn.render_graph`), force-directed `neato` layout with curved
   splines, edges colored by partial-correlation sign and weighted by magnitude.
 - Pipeline parameters (window/step/min-observations/max-lag/FDR-alpha/granularity)
   are now CLI-overridable and recorded as columns in the edge table, so runs
@@ -26,11 +26,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - Replaced `scripts/run_pipeline.py` and `scripts/render_graph.py` with a
-  single `fx-bn` CLI (`src/fx_bn/cli.py`, subcommands `run-pipeline` and
+  single `fx-pcn` CLI (`src/fx_pcn/cli.py`, subcommands `run-pipeline` and
   `render-graph`).
 - Extracted the `--append` merge logic (`run-pipeline` originally) into a
-  shared `fx_bn.incremental.merge_incremental`, reused by `compute-density`
+  shared `fx_pcn.incremental.merge_incremental`, reused by `compute-density`
   and `find-direction-flips`.
+- Renamed the project from `fx-bn` to `fx-pcn` (package, `src/fx_bn` ->
+  `src/fx_pcn`, CLI command, PyPI-style metadata) -- "Bayesian-network-style"
+  turned out not to accurately describe the method (see the "Not actually a
+  Bayesian network" note in README.md); `fx-pcn` ("partial-correlation
+  network") names the actual graph object instead.
 
 ## [0.1.0] - 2026-08-03
 

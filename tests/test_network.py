@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from fx_bn.network import fit_skeleton, infer_direction, rolling_windows
+from fx_pcn.network import fit_skeleton, infer_direction, rolling_windows
 
 
 def test_rolling_windows_one_day_windows_match_calendar_days():

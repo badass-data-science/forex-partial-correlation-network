@@ -5,9 +5,9 @@ import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from fx_bn import config, density, direction_flips, render_graph
-from fx_bn.influx_client import DEFAULT_START
-from fx_bn.pipeline import run as run_pipeline
+from fx_pcn import config, density, direction_flips, render_graph
+from fx_pcn.influx_client import DEFAULT_START
+from fx_pcn.pipeline import run as run_pipeline
 
 
 def _run_pipeline(args: argparse.Namespace) -> None:
@@ -118,7 +118,7 @@ def _add_find_direction_flips_parser(subparsers: argparse._SubParsersAction) -> 
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog='fx-bn')
+    parser = argparse.ArgumentParser(prog='fx-pcn')
     subparsers = parser.add_subparsers(dest='command', required=True)
     _add_run_pipeline_parser(subparsers)
     _add_render_graph_parser(subparsers)

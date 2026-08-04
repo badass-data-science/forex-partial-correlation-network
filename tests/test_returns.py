@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from fx_bn.returns import log_returns
+from fx_pcn.returns import log_returns
 
 
 def _wide_frame(closes: list[float], filled: list[bool]) -> pd.DataFrame:

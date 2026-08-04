@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from fx_bn import config
-from fx_bn.incremental import merge_incremental
+from fx_pcn import config
+from fx_pcn.incremental import merge_incremental
 
 _MAX_POSSIBLE_EDGES = len(config.PAIRS) * (len(config.PAIRS) - 1) // 2
 

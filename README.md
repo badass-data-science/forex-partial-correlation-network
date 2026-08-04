@@ -1,4 +1,4 @@
-# fx-bn
+# fx-pcn
 
 A time-varying partial-correlation network, with Granger-causal edge
 direction, over the 7 major FX pairs (`EUR/USD`, `GBP/USD`, `USD/JPY`,
@@ -21,8 +21,8 @@ pip install .
 pip install -e ".[dev]"
 ```
 
-This installs the `fx-bn` command (a console-script entry point) along with the
-`fx_bn` package. The project is a standard PEP 517/518 package (`hatchling`
+This installs the `fx-pcn` command (a console-script entry point) along with the
+`fx_pcn` package. The project is a standard PEP 517/518 package (`hatchling`
 backend) — nothing about it is specific to any particular installer.
 
 > This repo's own `.venv` happens to be managed with [`uv`](https://docs.astral.sh/uv/)
@@ -38,7 +38,7 @@ not just `dot`.
 ## Configuration
 
 The pipeline reads FX bar data from InfluxDB. These environment variables must
-already be set in the shell you run `fx-bn` from — there is no `.env` file:
+already be set in the shell you run `fx-pcn` from — there is no `.env` file:
 
 ```
 INFLUXDB_URL
@@ -61,20 +61,20 @@ the statistics on synthetic data and never touches InfluxDB.
 
 ## Running it
 
-Everything goes through the `fx-bn` command (or `python -m fx_bn.cli`):
+Everything goes through the `fx-pcn` command (or `python -m fx_pcn.cli`):
 
 ```bash
 # Build the edge table (full history since 2015)
-fx-bn run-pipeline --output output/edges.parquet
+fx-pcn run-pipeline --output output/edges.parquet
 
 # Quick smoke test against the last 30 days only
-fx-bn run-pipeline --output output/edges.parquet --days 30
+fx-pcn run-pipeline --output output/edges.parquet --days 30
 
 # Later on: pull in whatever's new since the last run, without refitting history
-fx-bn run-pipeline --output output/edges.parquet --append
+fx-pcn run-pipeline --output output/edges.parquet --append
 
 # Render the most recent date's graph as a PNG
-fx-bn render-graph --input output/edges.parquet --output output/graph.png
+fx-pcn render-graph --input output/edges.parquet --output output/graph.png
 ```
 
 `run-pipeline` options (all optional except `--output`):
@@ -237,12 +237,12 @@ snapshot into a *directed, time-varying* network.
 
 ### Not actually a Bayesian network
 
-Despite the package name (`fx-bn`), this is **not** a Bayesian network in the
-formal sense (Pearl-style: a directed *acyclic* graph, a conditional
-probability distribution at every node given its parents, a joint
-distribution that factorizes over the graph, and belief-propagation machinery
-for updating beliefs elsewhere given evidence at one node). Three concrete
-reasons it doesn't qualify:
+Despite the repo's title (it lives at `forex-bayesian-belief-networks`), this
+is **not** a Bayesian network in the formal sense (Pearl-style: a directed
+*acyclic* graph, a conditional probability distribution at every node given
+its parents, a joint distribution that factorizes over the graph, and
+belief-propagation machinery for updating beliefs elsewhere given evidence at
+one node). Three concrete reasons it doesn't qualify:
 
 - The skeleton (graphical lasso) is an **undirected** Gaussian graphical
   model — an edge means "conditionally dependent given the other 5 pairs,"
@@ -261,8 +261,10 @@ reasons it doesn't qualify:
 What this actually is: a time-varying Gaussian graphical model (a
 partial-correlation network) with Granger-causal lead-lag annotations on top
 — sometimes called a "mixed graph" informally, but distinct from a Bayesian
-network. The `fx-bn` name and repo title predate this clarification and are
-kept as an informal label, not a technical claim.
+network. The package itself was renamed from `fx-bn` to `fx-pcn` for exactly
+this reason — the repo's directory/GitHub name (`forex-bayesian-belief-networks`)
+is the one piece that still predates this clarification and hasn't been
+changed to match.
 
 ## Other parameter regimes
 
@@ -320,8 +322,8 @@ spotting structure across the whole time series rather than reading one
 date's graph at a time:
 
 ```bash
-fx-bn compute-density --input output/edges.parquet --output output/density.parquet
-fx-bn find-direction-flips --input output/edges.parquet --output output/flips.parquet
+fx-pcn compute-density --input output/edges.parquet --output output/density.parquet
+fx-pcn find-direction-flips --input output/edges.parquet --output output/flips.parquet
 ```
 
 Both take `--input` (an edge-table parquet from `run-pipeline`) and `--output`
@@ -360,8 +362,8 @@ edge to test. A pair transitioning between any of these five states (e.g. an
 edge disappearing, or reversing which pair leads) is a flip; the very first
 date in the series can't flip, since there's nothing before it to compare to.
 
-Both commands are pure functions of the edge table (`fx_bn.density.compute_density_table`,
-`fx_bn.direction_flips.find_direction_flips`) wrapped in a thin file-reading/writing
+Both commands are pure functions of the edge table (`fx_pcn.density.compute_density_table`,
+`fx_pcn.direction_flips.find_direction_flips`) wrapped in a thin file-reading/writing
 `run()` — no InfluxDB access, so they're fast and fully covered by synthetic-data
 tests. A planned next step is a daily report synthesizing both of these into a
 single human-readable summary; not built yet.
@@ -455,8 +457,8 @@ exists.
 ## Project layout
 
 ```
-src/fx_bn/
-  cli.py               fx-bn command: subcommand definitions and argument parsing
+src/fx_pcn/
+  cli.py               fx-pcn command: subcommand definitions and argument parsing
   config.py             Pairs, granularity, and all statistical defaults
   influx_client.py       Minimal read-only InfluxDB client
   data.py                Wide-frame fetch across all 7 pairs

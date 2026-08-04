@@ -44,7 +44,7 @@ def _latest_edges(edge_table: pd.DataFrame) -> pd.DataFrame:
 
 def build_graph(edges: pd.DataFrame) -> graphviz.Digraph:
     """One row per (pair_i, pair_j) edge for a single date -- see
-    fx_bn.network.build_edge_table for the schema."""
+    fx_pcn.network.build_edge_table for the schema."""
     row = edges.iloc[0]
     pairs = sorted(set(edges['pair_i']) | set(edges['pair_j']))
 

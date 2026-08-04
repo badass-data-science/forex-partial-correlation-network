@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from fx_bn import config
-from fx_bn.incremental import merge_incremental
+from fx_pcn import config
+from fx_pcn.incremental import merge_incremental
 
 # Distinct from 'undirected': 'undirected' means the edge existed that window
 # but Granger causality found no significant direction; NO_EDGE means the

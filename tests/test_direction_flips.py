@@ -2,7 +2,7 @@ import datetime
 
 import pandas as pd
 
-from fx_bn.direction_flips import find_direction_flips
+from fx_pcn.direction_flips import find_direction_flips
 
 DAY1 = datetime.date(2026, 1, 1)
 DAY2 = datetime.date(2026, 1, 2)

@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from fx_bn import config
-from fx_bn.data import fetch_wide_frame
-from fx_bn.incremental import merge_incremental
-from fx_bn.influx_client import DEFAULT_START
-from fx_bn.network import build_edge_table
-from fx_bn.returns import log_returns
+from fx_pcn import config
+from fx_pcn.data import fetch_wide_frame
+from fx_pcn.incremental import merge_incremental
+from fx_pcn.influx_client import DEFAULT_START
+from fx_pcn.network import build_edge_table
+from fx_pcn.returns import log_returns
 
 logger = logging.getLogger(__name__)
 

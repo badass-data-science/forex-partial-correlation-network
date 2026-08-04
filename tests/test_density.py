@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 import pytest
 
-from fx_bn.density import _MAX_POSSIBLE_EDGES, compute_density_table
+from fx_pcn.density import _MAX_POSSIBLE_EDGES, compute_density_table
 
 
 def test_compute_density_table_summarizes_each_date():

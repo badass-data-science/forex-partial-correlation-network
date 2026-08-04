@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from fx_bn import config
-from fx_bn.data import pair_to_colname
+from fx_pcn import config
+from fx_pcn.data import pair_to_colname
 
 
 def log_returns(wide_df: pd.DataFrame, pairs: list[str] = config.PAIRS) -> pd.DataFrame:

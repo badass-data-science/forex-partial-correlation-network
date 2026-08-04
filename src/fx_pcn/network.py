@@ -13,7 +13,7 @@ from sklearn.exceptions import ConvergenceWarning
 from statsmodels.stats.multitest import multipletests
 from statsmodels.tsa.stattools import grangercausalitytests
 
-from fx_bn import config
+from fx_pcn import config
 
 Edge = tuple[str, str]
 
