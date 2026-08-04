@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Render the most recent graph in a time-varying edge-table parquet as a PNG,
-via Graphviz (circular layout, curved spline edges)."""
+via Graphviz (force-directed neato layout, curved spline edges)."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def build_graph(edges: pd.DataFrame) -> graphviz.Digraph:
     row = edges.iloc[0]
     pairs = sorted(set(edges['pair_i']) | set(edges['pair_j']))
 
-    dot = graphviz.Digraph(engine='circo')
+    dot = graphviz.Digraph(engine='neato')
     dot.attr(bgcolor=SURFACE_COLOR, splines='curved', overlap='false', mindist='1.1', pad='0.4', dpi='150')
     dot.attr(
         'node',
