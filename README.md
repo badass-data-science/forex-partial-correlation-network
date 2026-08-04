@@ -36,14 +36,23 @@ not just `dot`.
 
 ## Configuration
 
-The pipeline reads FX bar data from InfluxDB. Copy `.env.example` to `.env` and
-fill in:
+The pipeline reads FX bar data from InfluxDB. These environment variables must
+already be set in the shell you run `fx-bn` from — there is no `.env` file:
 
 ```
-INFLUXDB_URL=
-INFLUXDB_TOKEN=
-INFLUXDB_ORG=
-INFLUXDB_BUCKET=
+INFLUXDB_URL
+INFLUXDB_TOKEN
+INFLUXDB_ORG
+INFLUXDB_BUCKET
+```
+
+e.g.:
+
+```bash
+export INFLUXDB_URL=https://...
+export INFLUXDB_TOKEN=...
+export INFLUXDB_ORG=...
+export INFLUXDB_BUCKET=...
 ```
 
 No credentials are needed just to run the test suite (`pytest`) — it exercises

@@ -10,10 +10,7 @@ from __future__ import annotations
 import os
 
 import pandas as pd
-from dotenv import load_dotenv
 from influxdb_client import InfluxDBClient
-
-load_dotenv()
 
 DEFAULT_START = '2015-01-01T00:00:00Z'
 
@@ -21,7 +18,7 @@ DEFAULT_START = '2015-01-01T00:00:00Z'
 def _env(name: str) -> str:
     value = os.environ.get(name)
     if not value:
-        raise RuntimeError(f'environment variable {name!r} is not set (see .env.example)')
+        raise RuntimeError(f'environment variable {name!r} is not set (see README.md)')
     return value
 
 

@@ -10,7 +10,6 @@ dependencies = [
     "numpy",
     "scikit-learn",
     "statsmodels",
-    "python-dotenv",
     "pyarrow",
     "graphviz",
 ]

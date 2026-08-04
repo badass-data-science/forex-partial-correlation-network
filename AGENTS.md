@@ -26,7 +26,7 @@ This project's `.venv` is `uv`-managed (`pyvenv.cfg` shows `uv = ...`) — there
 
 ```bash
 uv sync --extra dev
-cp .env.example .env   # fill in INFLUXDB_URL / INFLUXDB_TOKEN / INFLUXDB_ORG / INFLUXDB_BUCKET
+export INFLUXDB_URL=... INFLUXDB_TOKEN=... INFLUXDB_ORG=... INFLUXDB_BUCKET=...
 ```
 
 `uv sync` alone omits the `dev` extra (drops `pytest`) — always pass `--extra dev`
@@ -72,5 +72,6 @@ output.
 
 ## Secrets
 
-Never commit `.env` (already gitignored). `.env.example` documents the required
-variable names with empty values only.
+No `.env` file, by design — `INFLUXDB_URL`/`INFLUXDB_TOKEN`/`INFLUXDB_ORG`/`INFLUXDB_BUCKET`
+must already be set in the calling shell's environment (see README.md). Don't
+reintroduce a `.env`/`python-dotenv` loading path.
