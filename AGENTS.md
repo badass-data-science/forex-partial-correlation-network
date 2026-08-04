@@ -22,6 +22,10 @@ rolling window of H1 bars it:
 All of this is driven through a single CLI, `src/fx_pcn/cli.py` (entry point `fx-pcn`,
 also runnable as `python -m fx_pcn.cli`) with one subcommand per stage.
 
+This repo doesn't populate InfluxDB itself -- that's a separate repo,
+[`ETL-forex-time-series-data`](https://github.com/badass-data-science/ETL-forex-time-series-data),
+which must be run first to get real data into the bucket `fx-pcn` reads from.
+
 ## Setup
 
 This project's `.venv` is `uv`-managed (`pyvenv.cfg` shows `uv = ...`) — there is no
