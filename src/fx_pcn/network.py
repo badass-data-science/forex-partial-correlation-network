@@ -61,7 +61,14 @@ def fit_skeleton(window_returns: pd.DataFrame) -> dict[Edge, float]:
         # A rare residual ConvergenceWarning can still fire on an unusually
         # ill-conditioned window even with the constrained alpha grid above --
         # not worth surfacing per-window; the alpha grid is the real fix.
+        # The paired numpy RuntimeWarning ("invalid value encountered in
+        # subtract") is a side effect of that same non-convergence inside
+        # sklearn's coordinate-descent solver, not a sign of bad input --
+        # confirmed by hand on a real offending window (2015-01-11: input had
+        # no NaN/inf/zero-variance columns, and the resulting precision_ came
+        # out fully finite regardless).
         warnings.simplefilter('ignore', ConvergenceWarning)
+        warnings.simplefilter('ignore', RuntimeWarning)
         model.fit(standardized.to_numpy())
     precision = model.precision_
 
