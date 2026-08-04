@@ -181,6 +181,36 @@ correlation, being symmetric, can't answer either. Running both, on the same
 rolling window, one after the other, is what turns a static correlation
 snapshot into a *directed, time-varying* network.
 
+## Other parameter regimes
+
+The CLI defaults (`--window-days 5 --step-days 1 --granularity H1 --max-lag 4`)
+are tuned for one economically reasonable regime: intraweek lead-lag on hourly
+bars, with a lag window short enough to plausibly capture session-overlap
+effects (e.g. the London/New York handoff). It's not the only regime worth
+running, though — the same pipeline, pointed at different window/step/
+granularity/lag values, targets different underlying mechanisms and time
+horizons:
+
+| Regime | Granularity | Window | Step | Max lag | What it's meant to capture |
+|---|---|---|---|---|---|
+| **Default** | H1 | 5d | 1d | 4h | Intraweek lead-lag, e.g. session-overlap effects (London/NY) |
+| **Intraday/microstructure** | M15 or M5 | 1–2d | 1d (or intraday step) | 8–16 bars (~2–4h) | Session handoffs within a single day (Asia→London→NY), order-flow-driven co-movement |
+| **Macro/carry regime** | D1 | 30–90d | 5–7d | 1–5 days | Risk-on/risk-off comovement, carry-trade unwind dynamics — plays out over days, not hours |
+| **Policy-cycle regime** | D1 (or weekly resample) | 180d+ | 30d | 5–10 days | Central-bank rate-cycle-driven structure — e.g. USD/JPY vs USD/CAD relationships shifting across a hiking/cutting cycle |
+| **Event-conditioned** | H1 | short, anchored to calendar events | irregular (aligned to FOMC/NFP/ECB dates) | 1–4h | Whether the network's structure snaps to a different shape around scheduled macro releases |
+
+The general tradeoff across all of these: shorter windows/granularity are more
+responsive and can catch fast, session-driven relationships, but have fewer
+observations per fit (weaker Granger power, a noisier lasso skeleton); longer
+windows regain statistical power but smooth over regime changes, so a real
+shift (say, a central bank pivot) only shows up gradually, blended with the
+old regime.
+
+All but the event-conditioned row are just different `--window-days`/
+`--step-days`/`--granularity`/`--max-lag` values on the existing CLI — no code
+changes needed. The event-conditioned regime would need genuinely new logic
+(aligning windows to a macro calendar rather than stepping at a fixed interval).
+
 ## Output
 
 `run-pipeline` writes one row per `(date, pair_i, pair_j)` edge that survived
