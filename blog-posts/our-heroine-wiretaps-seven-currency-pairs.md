@@ -51,11 +51,28 @@ Filtering the edge table to a single date gives that day's graph outright — no
 
 ## What's Deliberately Not Here Yet
 
-The default settings — five-day windows, daily steps, hourly bars, a four-hour max lag — target one specific regime: intraweek lead-lag, the kind of thing a London/New York session handoff produces. The same pipeline, pointed at different window/step/granularity/lag values, targets everything from intraday microstructure up through multi-year policy-cycle structure, and every one of those besides an event-conditioned regime anchored to the macro calendar is just a flag change, no code required. The event-conditioned regime — snapping windows to FOMC or NFP dates instead of a fixed interval — is not built. Neither is a daily report that synthesizes density and direction-flip output into one human-readable summary instead of two parquet files an analyst has to correlate by hand, which is next on the list and which our heroine is choosing to announce publicly, mostly so that failing to build it becomes marginally more embarrassing than actually building it.
+The default settings — five-day windows, daily steps, hourly bars, a four-hour max lag — target one specific regime: intraweek lead-lag, the kind of thing a London/New York session handoff produces. The same pipeline, pointed at different window/step/granularity/lag values, targets everything from intraday microstructure up through multi-year policy-cycle structure, and every one of those besides an event-conditioned regime anchored to the macro calendar is just a flag change, no code required. Two things, though, are not built yet:
+
+- **An event-conditioned regime** — snapping windows to FOMC or NFP dates instead of stepping at a fixed interval.
+- **A daily synthesis report** — one human-readable summary combining density and direction-flip output, instead of two parquet files an analyst has to correlate by hand.
+
+Both are next on the list, which our heroine is choosing to announce publicly, mostly so that failing to build them becomes marginally more embarrassing than actually building them.
 
 ## Conclusion
 
 An empire this size cannot be run on vibes and pairwise correlation, and it turns out it also cannot be run on a naming convention borrowed from a formalism the pipeline doesn't actually implement. `fx-pcn` now tells our heroine, refit daily, which of her seven currency henchmen are conditionally entangled net of the other five, which one is giving the orders when a relationship has a clear direction, and which ones are just quietly running each other in a loop that no org chart — Bayesian or otherwise — was ever going to capture. The rename cost a changelog entry and a small amount of dignity. Continuing to call an undirected Gaussian graphical model with bidirected Granger edges a Bayesian network in front of people who'd notice would have cost considerably more.
+
+## Tags
+
+- Data Science
+- Python
+- Forex
+- Time Series
+- Graphical Lasso
+- Gaussian Graphical Models
+- Granger Causality
+- Network Analysis
+- Quantitative Finance
 
 ---
 
