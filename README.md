@@ -237,12 +237,15 @@ snapshot into a *directed, time-varying* network.
 
 ### Not actually a Bayesian network
 
-Despite the repo's title (it lives at `forex-bayesian-belief-networks`), this
-is **not** a Bayesian network in the formal sense (Pearl-style: a directed
-*acyclic* graph, a conditional probability distribution at every node given
-its parents, a joint distribution that factorizes over the graph, and
-belief-propagation machinery for updating beliefs elsewhere given evidence at
-one node). Three concrete reasons it doesn't qualify:
+This project used to be called `fx-bn` and lived in a repo titled
+`forex-bayesian-belief-networks` — both renamed (to `fx-pcn` and
+`forex-partial-correlation-network`) once it became clear the original name
+was inaccurate. This is **not** a Bayesian network in the formal sense
+(Pearl-style: a directed *acyclic* graph, a conditional probability
+distribution at every node given its parents, a joint distribution that
+factorizes over the graph, and belief-propagation machinery for updating
+beliefs elsewhere given evidence at one node). Three concrete reasons it
+never qualified:
 
 - The skeleton (graphical lasso) is an **undirected** Gaussian graphical
   model — an edge means "conditionally dependent given the other 5 pairs,"
@@ -261,10 +264,7 @@ one node). Three concrete reasons it doesn't qualify:
 What this actually is: a time-varying Gaussian graphical model (a
 partial-correlation network) with Granger-causal lead-lag annotations on top
 — sometimes called a "mixed graph" informally, but distinct from a Bayesian
-network. The package itself was renamed from `fx-bn` to `fx-pcn` for exactly
-this reason — the repo's directory/GitHub name (`forex-bayesian-belief-networks`)
-is the one piece that still predates this clarification and hasn't been
-changed to match.
+network. `fx-pcn` and `forex-partial-correlation-network` name that directly.
 
 ## Other parameter regimes
 

@@ -36,6 +36,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   turned out not to accurately describe the method (see the "Not actually a
   Bayesian network" note in README.md); `fx-pcn` ("partial-correlation
   network") names the actual graph object instead.
+- Renamed the GitHub repo (and local project directory) from
+  `forex-bayesian-belief-networks` to `forex-partial-correlation-network`,
+  for the same reason. GitHub redirects the old repo URL automatically.
 
 ## [0.1.0] - 2026-08-03
 
