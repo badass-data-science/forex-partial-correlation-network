@@ -16,6 +16,9 @@ def _run_pipeline(args: argparse.Namespace) -> None:
         start = (datetime.now(UTC) - timedelta(days=args.days)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     logging.basicConfig(level=logging.INFO)
+    if args.append and args.days is not None and args.output.exists():
+        logging.getLogger(__name__).warning('--days is ignored: --append fetches from the existing table\'s latest date instead')
+
     edges = run_pipeline(
         output_path=args.output,
         start=start,
@@ -25,6 +28,7 @@ def _run_pipeline(args: argparse.Namespace) -> None:
         max_lag=args.max_lag,
         fdr_alpha=args.fdr_alpha,
         granularity=args.granularity,
+        append=args.append,
     )
     print(edges.tail(20))
 
@@ -58,6 +62,13 @@ def _add_run_pipeline_parser(subparsers: argparse._SubParsersAction) -> None:
     )
     parser.add_argument(
         '--granularity', type=str, default=config.GRANULARITY, help=f'Bar granularity to fetch from InfluxDB (default: {config.GRANULARITY})'
+    )
+    parser.add_argument(
+        '--append',
+        action='store_true',
+        help='Append new dates to an existing --output file instead of recomputing its full history '
+        '(fetches only enough trailing data to fit windows after the existing table\'s latest date; '
+        'has no effect if --output does not exist yet)',
     )
     parser.set_defaults(handler=_run_pipeline)
 

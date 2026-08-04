@@ -69,6 +69,9 @@ fx-bn run-pipeline --output output/edges.parquet
 # Quick smoke test against the last 30 days only
 fx-bn run-pipeline --output output/edges.parquet --days 30
 
+# Later on: pull in whatever's new since the last run, without refitting history
+fx-bn run-pipeline --output output/edges.parquet --append
+
 # Render the most recent date's graph as a PNG
 fx-bn render-graph --input output/edges.parquet --output output/graph.png
 ```
@@ -85,6 +88,7 @@ fx-bn render-graph --input output/edges.parquet --output output/graph.png
 | `--max-lag` | 4 | Max lag tested for Granger causality |
 | `--fdr-alpha` | 0.05 | Benjamini-Hochberg FDR threshold for direction significance |
 | `--granularity` | H1 | Bar granularity to fetch from InfluxDB |
+| `--append` | off | Append new dates to an existing `--output` file instead of recomputing it from scratch |
 
 Every one of these settings is also written back into the output as a column
 (see [Output](#output) below), so edge tables produced with different settings
@@ -92,6 +96,24 @@ stay distinguishable — and safely concatenatable — after the fact.
 
 `render-graph` takes `--input` (an edge-table parquet) and `--output` (a PNG
 path), both required, and always renders the *most recent* date in that table.
+
+### Incremental updates (`--append`)
+
+Every row is keyed to a fixed trailing window ending on a specific date, so a
+window that's already been fit and written never needs to be recomputed —
+only dates after the existing table's most recent one do. `--append` uses
+this: if `--output` already exists, it reads that file, finds its latest
+`date`, fetches just enough trailing history (`--window-days` back from
+there) to fit the windows after it, and appends only those new rows —
+`--days` is ignored in this case, since the fetch start is derived from the
+existing data instead. If `--output` doesn't exist yet, `--append` has no
+effect and it's a normal full run.
+
+This rewrites the whole output file on each call (there's no partial/in-place
+parquet write), which is fine at this dataset's size — years of daily rows
+across 7 pairs is still a small file. It assumes the source data doesn't get
+revised after the fact; if InfluxDB's forward-filled bars could be backfilled
+or corrected post hoc, previously-written rows wouldn't reflect that.
 
 ## How it works
 

@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Pipeline parameters (window/step/min-observations/max-lag/FDR-alpha/granularity)
   are now CLI-overridable and recorded as columns in the edge table, so runs
   with differing settings stay distinguishable.
+- `run-pipeline --append`: incrementally adds new dates to an existing edge
+  table instead of recomputing its full history, since already-fit windows
+  never need to be refit.
 
 ### Changed
 - Replaced `scripts/run_pipeline.py` and `scripts/render_graph.py` with a
