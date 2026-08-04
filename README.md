@@ -1,7 +1,8 @@
 # fx-bn
 
-A time-varying, Bayesian-network-style graph over the 7 major FX pairs
-(`EUR/USD`, `GBP/USD`, `USD/JPY`, `USD/CHF`, `USD/CAD`, `AUD/USD`, `NZD/USD`).
+A time-varying partial-correlation network, with Granger-causal edge
+direction, over the 7 major FX pairs (`EUR/USD`, `GBP/USD`, `USD/JPY`,
+`USD/CHF`, `USD/CAD`, `AUD/USD`, `NZD/USD`).
 
 For each day, the pipeline looks back over a trailing window of hourly bars and
 asks two questions of every pair of currencies: *are these two conditionally
@@ -233,6 +234,35 @@ Granger causality then answers "which one moves first?" — a question partial
 correlation, being symmetric, can't answer either. Running both, on the same
 rolling window, one after the other, is what turns a static correlation
 snapshot into a *directed, time-varying* network.
+
+### Not actually a Bayesian network
+
+Despite the package name (`fx-bn`), this is **not** a Bayesian network in the
+formal sense (Pearl-style: a directed *acyclic* graph, a conditional
+probability distribution at every node given its parents, a joint
+distribution that factorizes over the graph, and belief-propagation machinery
+for updating beliefs elsewhere given evidence at one node). Three concrete
+reasons it doesn't qualify:
+
+- The skeleton (graphical lasso) is an **undirected** Gaussian graphical
+  model — an edge means "conditionally dependent given the other 5 pairs,"
+  which is the undirected-graph notion of conditional independence, not a DAG
+  factorization.
+- Granger causality orients edges by temporal predictive improvement, not by
+  the conditional-independence-based rules (colliders, Meek's rules) that
+  actual Bayesian-network structure-learning algorithms (PC, GES, etc.) use
+  to keep every orientation consistent with a single DAG.
+- Most decisively: the pipeline explicitly emits **`i<->j` bidirected edges**
+  whenever both directions test Granger-significant. A bidirected edge *is* a
+  cycle, and a DAG cannot contain one — so the moment any edge gets labeled
+  bidirected, the result is structurally disqualified from being a Bayesian
+  network, by definition.
+
+What this actually is: a time-varying Gaussian graphical model (a
+partial-correlation network) with Granger-causal lead-lag annotations on top
+— sometimes called a "mixed graph" informally, but distinct from a Bayesian
+network. The `fx-bn` name and repo title predate this clarification and are
+kept as an informal label, not a technical claim.
 
 ## Other parameter regimes
 

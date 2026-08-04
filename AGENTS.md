@@ -4,9 +4,12 @@ Guidance for AI coding agents working in this repository.
 
 ## What this is
 
-`fx-bn` builds a time-varying, Bayesian-network-style graph over the 7 major
-FX pairs (`EUR/USD`, `GBP/USD`, `USD/JPY`, `USD/CHF`, `USD/CAD`, `AUD/USD`,
-`NZD/USD`). For each rolling window of H1 bars it:
+`fx-bn` builds a time-varying partial-correlation network (an undirected
+Gaussian graphical model, not a Bayesian network -- see the "Not actually a
+Bayesian network" note in README.md if that distinction matters to you) with
+Granger-causal edge direction, over the 7 major FX pairs (`EUR/USD`,
+`GBP/USD`, `USD/JPY`, `USD/CHF`, `USD/CAD`, `AUD/USD`, `NZD/USD`). For each
+rolling window of H1 bars it:
 
 1. Fetches wide-form price data from InfluxDB (`src/fx_bn/influx_client.py`, `data.py`).
 2. Computes log returns, masking any return that spans a forward-filled bar (`returns.py`).
