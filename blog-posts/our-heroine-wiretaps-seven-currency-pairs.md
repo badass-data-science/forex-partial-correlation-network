@@ -1,6 +1,6 @@
 # Our Heroine Wiretaps Seven Currency Pairs
 
-### Building a Time-Varying Partial-Correlation Network with Granger-Causal Direction Over the Seven Major FX Pairs — And Owning Up to a Naming Mistake in Front of the Entire Henchman Roster
+### Building a Time-Varying Partial-Correlation Network with Granger-Causal Direction Over the Seven Major FX Pairs
 
 Every supervillain empire runs on rumor control. Our heroine's currency pair henchmen — EUR/USD, GBP/USD, USD/JPY, USD/CHF, USD/CAD, AUD/USD, and NZD/USD, seven degenerates who have never once RSVP'd honestly to a staff meeting — move in suspicious lockstep some weeks and go completely silent on each other the next. She has long suspected an org chart hiding under the org chart: a shadow network of who's actually coordinating with whom, updated continuously, that no amount of glaring across the boardroom table was ever going to reveal by inspection. So she built a pipeline to extract it from the only thing the currency pairs can't fake in real time — how their returns actually move together, hour by hour, net of everyone else's excuses.
 
