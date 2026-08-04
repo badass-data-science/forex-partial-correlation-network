@@ -23,7 +23,9 @@ def _env(name: str) -> str:
 
 
 def _client() -> InfluxDBClient:
-    return InfluxDBClient(url=_env('INFLUXDB_URL'), token=_env('INFLUXDB_TOKEN'), org=_env('INFLUXDB_ORG'))
+    return InfluxDBClient(
+        url=_env('INFLUXDB_URL'), token=_env('INFLUXDB_TOKEN'), org=_env('INFLUXDB_ORG')
+    )
 
 
 def query_pair_frame(
@@ -59,8 +61,10 @@ def query_pair_frame(
 
     if '_time' in df.columns:
         df['unix_epoch_s'] = (
-            pd.to_datetime(df['_time'], utc=True).astype('datetime64[ns, UTC]').astype('int64') // 10**9
+            pd.to_datetime(df['_time'], utc=True).astype('datetime64[ns, UTC]').astype('int64')
+            // 10**9
         )
         df = df.drop(columns=['_time'])
 
-    return df.sort_values('unix_epoch_s').reset_index(drop=True)
+    sorted_df: pd.DataFrame = df.sort_values('unix_epoch_s').reset_index(drop=True)
+    return sorted_df

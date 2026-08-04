@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `ruff` (lint + format) and `mypy` (type-checking, `disallow_untyped_defs`) as
+  dev dependencies, configured in `pyproject.toml`. `src/fx_pcn` is fully
+  type-hinted and passes both clean; no CI wiring yet.
 - Graphviz-based PNG rendering of the most recent graph in an edge-table
   parquet (`fx_pcn.render_graph`), force-directed `neato` layout with curved
   splines, edges colored by partial-correlation sign and weighted by magnitude.

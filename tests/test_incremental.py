@@ -24,7 +24,11 @@ def test_merge_incremental_keeps_existing_and_appends_only_new_dates():
 
     merged = merge_incremental(existing, freshly_computed, last_date=datetime.date(2026, 8, 2))
 
-    assert list(merged['date']) == [datetime.date(2026, 8, 1), datetime.date(2026, 8, 2), datetime.date(2026, 8, 3)]
+    assert list(merged['date']) == [
+        datetime.date(2026, 8, 1),
+        datetime.date(2026, 8, 2),
+        datetime.date(2026, 8, 3),
+    ]
     assert list(merged['partial_corr']) == [0.1, 0.2, 0.3]
 
 

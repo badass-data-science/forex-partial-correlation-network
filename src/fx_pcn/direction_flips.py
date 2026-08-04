@@ -39,12 +39,18 @@ def find_direction_flips(edges: pd.DataFrame, pairs: list[str] = config.PAIRS) -
         columns=['date', 'pair_i', 'pair_j'],
     )
 
-    states = grid.merge(edges[['date', 'pair_i', 'pair_j', 'direction']], on=['date', 'pair_i', 'pair_j'], how='left')
+    states = grid.merge(
+        edges[['date', 'pair_i', 'pair_j', 'direction']],
+        on=['date', 'pair_i', 'pair_j'],
+        how='left',
+    )
     states['direction'] = states['direction'].fillna(NO_EDGE)
     states = states.sort_values(['pair_i', 'pair_j', 'date'])
 
     states['previous_direction'] = states.groupby(['pair_i', 'pair_j'])['direction'].shift(1)
-    flipped = states['previous_direction'].notna() & (states['direction'] != states['previous_direction'])
+    flipped = states['previous_direction'].notna() & (
+        states['direction'] != states['previous_direction']
+    )
 
     flips = states[flipped].rename(columns={'direction': 'new_direction'})
     columns = ['date', 'pair_i', 'pair_j', 'previous_direction', 'new_direction']

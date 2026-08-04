@@ -17,7 +17,7 @@ Requires Python >= 3.11.
 
 ```bash
 pip install .
-# or, for development (adds pytest):
+# or, for development (adds pytest, ruff, mypy):
 pip install -e ".[dev]"
 ```
 
@@ -490,3 +490,16 @@ Tests favor synthetic data with a known ground truth over real fixtures — e.g.
 constructing a series where `B` is 90% driven by `A` and asserting the
 skeleton recovers that edge, or where `Y` is built to lag `X` and asserting
 Granger direction picks it up correctly. No InfluxDB connection is needed.
+
+## Linting and type-checking
+
+```bash
+ruff check .      # lint (pyflakes, pycodestyle, isort, pyupgrade, bugbear, simplify)
+ruff format .     # format (single-quote strings, 100-column lines)
+mypy              # static type-checking, src/fx_pcn only
+```
+
+`fx_pcn` is fully type-hinted and passes `mypy` with `disallow_untyped_defs`.
+All three tools, plus `pytest`, are configured in `pyproject.toml` and run
+against a clean checkout with no extra setup once `pip install -e ".[dev]"`
+(or `uv sync --extra dev`) has been run.

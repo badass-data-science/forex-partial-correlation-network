@@ -49,10 +49,18 @@ and never touch `influx_client`.
 
 ```bash
 pytest                                                  # run the test suite
+ruff check .                                            # lint
+ruff format .                                           # format (single quotes, 100-column lines)
+mypy                                                     # type-check src/fx_pcn
 fx-pcn run-pipeline --output output/edges.parquet        # full pipeline, full history since 2015
 fx-pcn run-pipeline --output output/edges.parquet --days 30   # quick smoke test, last 30 days only
 fx-pcn render-graph --input output/edges.parquet --output output/graph.png   # PNG of the most recent graph
 ```
+
+Run `ruff check .`, `ruff format --check .`, and `mypy` before considering any change to
+`src/fx_pcn` done -- all three are configured in `pyproject.toml` and expected to pass
+clean. New functions need type hints; `mypy` is configured with `disallow_untyped_defs`
+and will fail otherwise.
 
 ## Conventions to preserve
 

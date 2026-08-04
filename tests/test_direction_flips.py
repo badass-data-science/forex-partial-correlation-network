@@ -24,11 +24,35 @@ def test_find_direction_flips_detects_edge_appearing_disappearing_and_reversing(
 
     flips = find_direction_flips(edges, pairs=['A', 'B', 'C'])
 
-    assert list(flips.columns) == ['date', 'pair_i', 'pair_j', 'previous_direction', 'new_direction']
+    assert list(flips.columns) == [
+        'date',
+        'pair_i',
+        'pair_j',
+        'previous_direction',
+        'new_direction',
+    ]
     assert flips.to_dict('records') == [
-        {'date': DAY2, 'pair_i': 'A', 'pair_j': 'B', 'previous_direction': 'undirected', 'new_direction': 'no_edge'},
-        {'date': DAY2, 'pair_i': 'B', 'pair_j': 'C', 'previous_direction': 'no_edge', 'new_direction': 'B<->C'},
-        {'date': DAY3, 'pair_i': 'A', 'pair_j': 'B', 'previous_direction': 'no_edge', 'new_direction': 'A->B'},
+        {
+            'date': DAY2,
+            'pair_i': 'A',
+            'pair_j': 'B',
+            'previous_direction': 'undirected',
+            'new_direction': 'no_edge',
+        },
+        {
+            'date': DAY2,
+            'pair_i': 'B',
+            'pair_j': 'C',
+            'previous_direction': 'no_edge',
+            'new_direction': 'B<->C',
+        },
+        {
+            'date': DAY3,
+            'pair_i': 'A',
+            'pair_j': 'B',
+            'previous_direction': 'no_edge',
+            'new_direction': 'A->B',
+        },
     ]
 
 

@@ -39,7 +39,8 @@ def _edge_width(pcorr: float) -> float:
 
 def _latest_edges(edge_table: pd.DataFrame) -> pd.DataFrame:
     latest_date = edge_table['date'].max()
-    return edge_table[edge_table['date'] == latest_date]
+    latest_edges: pd.DataFrame = edge_table[edge_table['date'] == latest_date]
+    return latest_edges
 
 
 def build_graph(edges: pd.DataFrame) -> graphviz.Digraph:
@@ -49,7 +50,14 @@ def build_graph(edges: pd.DataFrame) -> graphviz.Digraph:
     pairs = sorted(set(edges['pair_i']) | set(edges['pair_j']))
 
     dot = graphviz.Digraph(engine='neato')
-    dot.attr(bgcolor=SURFACE_COLOR, splines='curved', overlap='false', mindist='1.1', pad='0.4', dpi='150')
+    dot.attr(
+        bgcolor=SURFACE_COLOR,
+        splines='curved',
+        overlap='false',
+        mindist='1.1',
+        pad='0.4',
+        dpi='150',
+    )
     dot.attr(
         'node',
         shape='circle',
@@ -68,7 +76,7 @@ def build_graph(edges: pd.DataFrame) -> graphviz.Digraph:
 
     for _, edge in edges.iterrows():
         color = _edge_color(edge['partial_corr'])
-        width = f"{_edge_width(edge['partial_corr']):.2f}"
+        width = f'{_edge_width(edge["partial_corr"]):.2f}'
         direction = edge['direction']
 
         if '<->' in direction:
@@ -87,16 +95,18 @@ def build_graph(edges: pd.DataFrame) -> graphviz.Digraph:
             # fontcolor stays a fixed ink tone rather than matching the edge:
             # same-hue text sitting directly on a thick same-color stroke is
             # unreadable no matter where the label lands.
-            edge_kwargs['xlabel'] = f"{edge['partial_corr']:+.2f}"
+            edge_kwargs['xlabel'] = f'{edge["partial_corr"]:+.2f}'
             edge_kwargs['fontcolor'] = INK_COLOR
         dot.edge(source, target, **edge_kwargs)
 
     dot.attr(
         label=(
-            f"FX partial-correlation network -- {row['date']}\n"
-            f"window {row['window_days']}d, step {row['step_days']}d, {row['granularity']} bars, "
-            f"min obs {row['min_observations']}, max lag {row['max_lag']}, FDR alpha {row['fdr_alpha']}\n"
-            'blue = positive, red = negative partial correlation; width scales with |partial correlation|; '
+            f'FX partial-correlation network -- {row["date"]}\n'
+            f'window {row["window_days"]}d, step {row["step_days"]}d, {row["granularity"]} bars, '
+            f'min obs {row["min_observations"]}, max lag {row["max_lag"]}, '
+            f'FDR alpha {row["fdr_alpha"]}\n'
+            'blue = positive, red = negative partial correlation; '
+            'width scales with |partial correlation|; '
             'arrows mark Granger-significant direction'
         ),
         labelloc='b',
@@ -113,5 +123,9 @@ def render(input_path: Path, output_path: Path) -> None:
     dot = build_graph(edges)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    rendered = Path(dot.render(filename=output_path.stem, directory=str(output_path.parent), format='png', cleanup=True))
+    rendered = Path(
+        dot.render(
+            filename=output_path.stem, directory=str(output_path.parent), format='png', cleanup=True
+        )
+    )
     rendered.replace(output_path)

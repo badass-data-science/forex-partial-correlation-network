@@ -33,7 +33,9 @@ def rolling_windows(
     `min_observations` rows -- too-sparse windows (early history, holiday-heavy
     weeks) are skipped rather than fit on unstable estimates.
     """
-    dates = pd.date_range(returns_df.index.min().normalize(), returns_df.index.max().normalize(), freq=f'{step_days}D')
+    dates = pd.date_range(
+        returns_df.index.min().normalize(), returns_df.index.max().normalize(), freq=f'{step_days}D'
+    )
 
     for date in dates:
         window_end = date + pd.Timedelta(days=1)
@@ -84,7 +86,7 @@ def _granger_pvalue(cause: pd.Series, effect: pd.Series, max_lag: int) -> float:
     data = np.column_stack([effect.to_numpy(), cause.to_numpy()])
     with contextlib.redirect_stdout(io.StringIO()):
         results = grangercausalitytests(data, maxlag=max_lag)
-    return results[max_lag][0]['ssr_ftest'][1]
+    return float(results[max_lag][0]['ssr_ftest'][1])
 
 
 def infer_direction(
@@ -119,7 +121,7 @@ def infer_direction(
 
     records = []
     for (edge, pcorr), p_ij, p_ji, sig_ij, sig_ji in zip(
-        edge_list, pvals_i_to_j, pvals_j_to_i, sig_i_to_j, sig_j_to_i
+        edge_list, pvals_i_to_j, pvals_j_to_i, sig_i_to_j, sig_j_to_i, strict=True
     ):
         i, j = edge
         if sig_ij and sig_ji:

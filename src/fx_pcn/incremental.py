@@ -5,7 +5,9 @@ import datetime
 import pandas as pd
 
 
-def merge_incremental(existing: pd.DataFrame, freshly_computed: pd.DataFrame, last_date: datetime.date) -> pd.DataFrame:
+def merge_incremental(
+    existing: pd.DataFrame, freshly_computed: pd.DataFrame, last_date: datetime.date
+) -> pd.DataFrame:
     """Keep every existing row and append only the freshly computed rows for
     dates after `last_date` -- shared by every derived table in this project
     that gets rebuilt incrementally (new dates appended) rather than from

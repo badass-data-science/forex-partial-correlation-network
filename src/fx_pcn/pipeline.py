@@ -43,10 +43,19 @@ def run(
     if append and output_path.exists():
         existing = pd.read_parquet(output_path)
         last_date = existing['date'].max()
-        start = (pd.Timestamp(last_date) - pd.Timedelta(days=window_days)).strftime('%Y-%m-%dT%H:%M:%SZ')
-        logger.info('Appending to %s (existing data ends %s); fetching from %s', output_path, last_date, start)
+        start = (pd.Timestamp(last_date) - pd.Timedelta(days=window_days)).strftime(
+            '%Y-%m-%dT%H:%M:%SZ'
+        )
+        logger.info(
+            'Appending to %s (existing data ends %s); fetching from %s',
+            output_path,
+            last_date,
+            start,
+        )
 
-    logger.info('Fetching %s bars for %d pairs from InfluxDB (since %s)', granularity, len(pairs), start)
+    logger.info(
+        'Fetching %s bars for %d pairs from InfluxDB (since %s)', granularity, len(pairs), start
+    )
     wide = fetch_wide_frame(pairs, granularity=granularity, start=start)
     logger.info('Fetched %d bars spanning %s to %s', len(wide), wide.index.min(), wide.index.max())
 
@@ -62,6 +71,7 @@ def run(
     )
 
     if existing is not None:
+        assert last_date is not None  # set alongside `existing`, above
         edges = merge_incremental(existing, edges, last_date)
 
     logger.info('Built %d edges across %d distinct dates', len(edges), edges['date'].nunique())
