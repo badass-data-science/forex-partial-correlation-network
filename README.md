@@ -117,8 +117,9 @@ or corrected post hoc, previously-written rows wouldn't reflect that.
 
 ## How it works
 
-For each rolling window of hourly bars, the pipeline runs three stages:
-returns, then structure, then direction.
+For each rolling window of hourly bars, the pipeline runs three stages —
+returns, then structure, then direction — and two further analyses derive
+additional time series from the resulting edge table.
 
 ### 1. Returns
 
@@ -193,6 +194,36 @@ with **Benjamini-Hochberg FDR** (`statsmodels.stats.multitest.multipletests`,
 | Both survive | `i<->j` (bidirected) |
 | Neither survives | `undirected` |
 
+### 4. Derived analyses: density and direction flips
+
+Two more computations run on the *finished* edge table rather than on raw
+prices, turning the sequence of daily graphs into two additional time series.
+
+**Network density** is a per-date summary of the graph as a whole — just an
+aggregation over that date's edge rows:
+
+$$
+\text{density}_t = \frac{|E_t|}{21}, \qquad \overline{|\rho|}_t = \frac{1}{|E_t|}\sum_{(i,j) \in E_t} |\rho_{ij}|
+$$
+
+where $E_t$ is the set of edges present on date *t* and 21 = C(7,2) is every
+possible pair among the 7 majors. Alongside these it also tallies how many of
+that date's edges are `i->j`/`j->i`, `i<->j` (bidirected), or `undirected`.
+Tracking this over time turns "is the graph getting denser/stronger" from a
+mental exercise — scanning 20-odd rows a day by eye — into a single number per
+date.
+
+**Direction flips** answer a different question: not "how connected is the
+graph today" but "did any specific relationship just change." A missing row
+for a pair on some date means the lasso penalty zeroed it out (no edge), and
+treating that as absent data would make disappearance invisible — so the full
+21-pair grid is reconstructed for every date, with a fifth state, `no_edge`,
+filled in wherever a pair has no row that date. Comparing each pair's state on
+date *t* to its state on the previous date *actually present* in the table
+(not necessarily the calendar day before, if `--step-days` skips days) flags
+every pair whose state just changed: an edge appearing or disappearing, a
+direction reversing, or a pair gaining or losing Granger significance.
+
 ### Why this combination
 
 Graphical lasso answers "is there a direct relationship here, net of the other
@@ -252,19 +283,75 @@ edges are the rows for that date. Pairs with no row for a given date had their
 partial correlation zeroed out by the lasso penalty that window — i.e., no
 edge, not missing data.
 
+## Derived analyses
+
+Two more subcommands turn an edge-table parquet into a compact summary, for
+spotting structure across the whole time series rather than reading one
+date's graph at a time:
+
+```bash
+fx-bn compute-density --input output/edges.parquet --output output/density.parquet
+fx-bn find-direction-flips --input output/edges.parquet --output output/flips.parquet
+```
+
+Both take `--input` (an edge-table parquet from `run-pipeline`) and `--output`
+(required), and both support `--append`: like `run-pipeline --append`, if
+`--output` already exists, only the dates after its most recent one are
+computed and appended rather than rebuilding the whole table from scratch.
+
+**`compute-density`** — one row per date, summarizing that day's graph as a
+whole:
+
+| Column | Meaning |
+|---|---|
+| `date` | The date being summarized |
+| `edge_count` | Number of edges the lasso penalty kept that date |
+| `density` | `edge_count` divided by 21 (all possible pairs among the 7 majors) |
+| `mean_abs_partial_corr` | Mean `\|partial_corr\|` across that date's edges |
+| `directed_edge_count`, `bidirected_edge_count`, `undirected_edge_count` | How many of that date's edges came out each way |
+
+A densifying, strengthening graph over time is a plausible regime-shift or
+rising-systemic-risk signal — markets tend to lose diversification (comove
+more, and more strongly) under stress.
+
+**`find-direction-flips`** — one row per date a given pair's relationship
+*changed* from the date before it:
+
+| Column | Meaning |
+|---|---|
+| `date` | The date the change is first seen on |
+| `pair_i`, `pair_j` | The two FX pairs |
+| `previous_direction`, `new_direction` | The state before and after — `i->j`, `j->i`, `i<->j`, `undirected`, or `no_edge` |
+
+`no_edge` is distinct from `undirected`: `undirected` means the edge existed
+that window but Granger causality found no significant direction, while
+`no_edge` means the lasso penalty zeroed the pair out entirely — there was no
+edge to test. A pair transitioning between any of these five states (e.g. an
+edge disappearing, or reversing which pair leads) is a flip; the very first
+date in the series can't flip, since there's nothing before it to compare to.
+
+Both commands are pure functions of the edge table (`fx_bn.density.compute_density_table`,
+`fx_bn.direction_flips.find_direction_flips`) wrapped in a thin file-reading/writing
+`run()` — no InfluxDB access, so they're fast and fully covered by synthetic-data
+tests. A planned next step is a daily report synthesizing both of these into a
+single human-readable summary; not built yet.
+
 ## Project layout
 
 ```
 src/fx_bn/
-  cli.py            fx-bn command: run-pipeline / render-graph subcommands
-  config.py          Pairs, granularity, and all statistical defaults
-  influx_client.py    Minimal read-only InfluxDB client
-  data.py             Wide-frame fetch across all 7 pairs
-  returns.py          Log returns, forward-fill masking
-  network.py          Graphical-lasso skeleton + Granger direction inference
-  pipeline.py         Wires the above together, writes the edge table
-  render_graph.py      Graphviz PNG rendering of the most recent graph
-tests/                 Statistical logic tested on synthetic, ground-truth data
+  cli.py               fx-bn command: subcommand definitions and argument parsing
+  config.py             Pairs, granularity, and all statistical defaults
+  influx_client.py       Minimal read-only InfluxDB client
+  data.py                Wide-frame fetch across all 7 pairs
+  returns.py             Log returns, forward-fill masking
+  network.py             Graphical-lasso skeleton + Granger direction inference
+  pipeline.py            Wires the above together, writes the edge table (run-pipeline)
+  render_graph.py         Graphviz PNG rendering of the most recent graph (render-graph)
+  density.py              Per-date network-density summary (compute-density)
+  direction_flips.py       Detects edge-direction changes date over date (find-direction-flips)
+  incremental.py           Shared "append only new dates" merge helper
+tests/                    Statistical logic tested on synthetic, ground-truth data
 ```
 
 ## Testing

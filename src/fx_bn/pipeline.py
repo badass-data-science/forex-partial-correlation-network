@@ -8,20 +8,12 @@ import pandas as pd
 
 from fx_bn import config
 from fx_bn.data import fetch_wide_frame
+from fx_bn.incremental import merge_incremental
 from fx_bn.influx_client import DEFAULT_START
 from fx_bn.network import build_edge_table
 from fx_bn.returns import log_returns
 
 logger = logging.getLogger(__name__)
-
-
-def _merge_incremental(existing: pd.DataFrame, freshly_computed: pd.DataFrame, last_date: datetime.date) -> pd.DataFrame:
-    """Every window ending on or before `last_date` was already fit and written
-    on a previous run -- keep those rows as-is and only append the newly
-    computed rows for dates after it, rather than re-fitting history that
-    can't have changed."""
-    new_rows = freshly_computed[freshly_computed['date'] > last_date]
-    return pd.concat([existing, new_rows], ignore_index=True)
 
 
 def run(
@@ -70,7 +62,7 @@ def run(
     )
 
     if existing is not None:
-        edges = _merge_incremental(existing, edges, last_date)
+        edges = merge_incremental(existing, edges, last_date)
 
     logger.info('Built %d edges across %d distinct dates', len(edges), edges['date'].nunique())
 

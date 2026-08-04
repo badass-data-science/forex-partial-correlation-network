@@ -2,7 +2,7 @@ import datetime
 
 import pandas as pd
 
-from fx_bn.pipeline import _merge_incremental
+from fx_bn.incremental import merge_incremental
 
 
 def test_merge_incremental_keeps_existing_and_appends_only_new_dates():
@@ -22,7 +22,7 @@ def test_merge_incremental_keeps_existing_and_appends_only_new_dates():
         }
     )
 
-    merged = _merge_incremental(existing, freshly_computed, last_date=datetime.date(2026, 8, 2))
+    merged = merge_incremental(existing, freshly_computed, last_date=datetime.date(2026, 8, 2))
 
     assert list(merged['date']) == [datetime.date(2026, 8, 1), datetime.date(2026, 8, 2), datetime.date(2026, 8, 3)]
     assert list(merged['partial_corr']) == [0.1, 0.2, 0.3]
@@ -32,7 +32,7 @@ def test_merge_incremental_with_no_new_dates_returns_existing_unchanged():
     existing = pd.DataFrame({'date': [datetime.date(2026, 8, 1)], 'partial_corr': [0.1]})
     freshly_computed = pd.DataFrame({'date': [datetime.date(2026, 8, 1)], 'partial_corr': [0.999]})
 
-    merged = _merge_incremental(existing, freshly_computed, last_date=datetime.date(2026, 8, 1))
+    merged = merge_incremental(existing, freshly_computed, last_date=datetime.date(2026, 8, 1))
 
     assert list(merged['date']) == [datetime.date(2026, 8, 1)]
     assert list(merged['partial_corr']) == [0.1]

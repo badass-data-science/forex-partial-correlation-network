@@ -5,7 +5,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from fx_bn import config, render_graph
+from fx_bn import config, density, direction_flips, render_graph
 from fx_bn.influx_client import DEFAULT_START
 from fx_bn.pipeline import run as run_pipeline
 
@@ -36,6 +36,16 @@ def _run_pipeline(args: argparse.Namespace) -> None:
 def _render_graph(args: argparse.Namespace) -> None:
     render_graph.render(args.input, args.output)
     print(f'Wrote {args.output}')
+
+
+def _compute_density(args: argparse.Namespace) -> None:
+    result = density.run(args.input, args.output, append=args.append)
+    print(result.tail(20))
+
+
+def _find_direction_flips(args: argparse.Namespace) -> None:
+    result = direction_flips.run(args.input, args.output, append=args.append)
+    print(result.tail(20))
 
 
 def _add_run_pipeline_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -80,11 +90,40 @@ def _add_render_graph_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.set_defaults(handler=_render_graph)
 
 
+def _add_derived_table_args(parser: argparse.ArgumentParser, input_help: str, output_help: str) -> None:
+    parser.add_argument('--input', type=Path, required=True, help=input_help)
+    parser.add_argument('--output', type=Path, required=True, help=output_help)
+    parser.add_argument(
+        '--append',
+        action='store_true',
+        help='Append new dates to an existing --output file instead of recomputing it from scratch '
+        '(has no effect if --output does not exist yet)',
+    )
+
+
+def _add_compute_density_parser(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser(
+        'compute-density', help='Summarize each date in an edge-table parquet into a network-density time series'
+    )
+    _add_derived_table_args(parser, 'Edge-table parquet produced by run-pipeline', 'Output path for the density table (parquet)')
+    parser.set_defaults(handler=_compute_density)
+
+
+def _add_find_direction_flips_parser(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser(
+        'find-direction-flips', help='Find every date a pair\'s edge direction changed from the date before it'
+    )
+    _add_derived_table_args(parser, 'Edge-table parquet produced by run-pipeline', 'Output path for the direction-flips table (parquet)')
+    parser.set_defaults(handler=_find_direction_flips)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog='fx-bn')
     subparsers = parser.add_subparsers(dest='command', required=True)
     _add_run_pipeline_parser(subparsers)
     _add_render_graph_parser(subparsers)
+    _add_compute_density_parser(subparsers)
+    _add_find_direction_flips_parser(subparsers)
     return parser
 
 

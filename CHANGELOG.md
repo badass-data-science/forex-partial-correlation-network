@@ -16,11 +16,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `run-pipeline --append`: incrementally adds new dates to an existing edge
   table instead of recomputing its full history, since already-fit windows
   never need to be refit.
+- `compute-density`: derives a per-date network-density time series (edge
+  count, density, mean |partial_corr|, directed/bidirected/undirected counts)
+  from an edge-table parquet.
+- `find-direction-flips`: derives every date a pair's edge relationship
+  changed from the date before it, including transitions to/from having no
+  edge at all (distinct from `undirected`). Both new subcommands support
+  `--append`.
 
 ### Changed
 - Replaced `scripts/run_pipeline.py` and `scripts/render_graph.py` with a
   single `fx-bn` CLI (`src/fx_bn/cli.py`, subcommands `run-pipeline` and
   `render-graph`).
+- Extracted the `--append` merge logic (`run-pipeline` originally) into a
+  shared `fx_bn.incremental.merge_incremental`, reused by `compute-density`
+  and `find-direction-flips`.
 
 ## [0.1.0] - 2026-08-03
 
