@@ -336,6 +336,92 @@ Both commands are pure functions of the edge table (`fx_bn.density.compute_densi
 tests. A planned next step is a daily report synthesizing both of these into a
 single human-readable summary; not built yet.
 
+## Interpreting the results
+
+The rest of this README is about how the numbers get computed. This section
+is about what to actually *do* with them — reading the graph image, the
+density series, and the flip log the way an analyst would, not a statistician.
+
+### Reading the graph image
+
+`render-graph`'s PNG isn't just a picture of the math — every visual choice
+maps to something you'd want to know at a glance:
+
+| What you see | What it means |
+|---|---|
+| A **blue** line | Those two pairs move *together* — one up tends to come with the other up |
+| A **red** line | Those two pairs move *opposite* each other |
+| A **thick** line | A strong relationship (large \|partial correlation\|) |
+| A **thin, pale** line | A weak but still statistically real relationship |
+| **No line at all** between two pairs | The model found *no direct link* between them once the other 5 pairs are accounted for — not "weak," but "explained away." Often this means both pairs are only related through a third one (commonly, they're both just tracking a broad dollar move) |
+| A **number** on a line (e.g. `+0.37`) | Shown only for the stronger relationships, to avoid clutter — a missing number doesn't mean "no relationship," just "not one of the strongest that day" |
+| An **arrowhead** | Granger causality found real evidence that one pair's moves *predict* the other's next moves — a lead-lag relationship, not just "these move together" |
+| **No arrowhead** (plain line) | The two are related, but the data can't tell which one is leading |
+| **Arrowheads on both ends** | Each pair seems to lead the other. Treat this one with a little extra skepticism — fast-moving, simultaneous reactions to shared news can produce this pattern even without a genuine two-way feedback loop |
+| **Where a pair sits in the picture** | The layout is force-directed: pairs with more and stronger connections get pulled toward the center, and isolated pairs drift to the outside. A pair sitting in the middle of a busy image is that day's "hub" — the one whose moves are rippling most broadly through the majors |
+
+A good habit: before reading anything into a specific edge, check whether it's
+been stable across the last few days' images (or the `find-direction-flips`
+output — see below) rather than trusting a single day's picture. Any one day's
+graph is a noisy statistical snapshot, not a settled fact about the market.
+
+### Reading the density time series
+
+Think of `compute-density`'s output as a single-number weather report for
+"how tangled is the FX market right now":
+
+- **Rising `edge_count`/`density`** — the majors are becoming more
+  interconnected. This often shows up around market stress or a single
+  dominant macro theme (e.g. a broad risk-on/risk-off move, or a shared dollar
+  driver) that pushes everything to move together, crowding out
+  pair-specific, idiosyncratic behavior.
+- **Falling `edge_count`/`density`** — pairs are behaving more independently.
+  Usually a calmer market, or one where pair-specific news (not a shared
+  macro theme) is what's actually driving prices.
+- **`edge_count` and `mean_abs_partial_corr` don't always move together** —
+  a day with many *weak* edges is a different regime from a day with a few
+  *very strong* ones. The first looks like broad, mild co-movement; the
+  second looks like a small cluster of pairs reacting intensely to the same
+  thing.
+- **A jump in `bidirected_edge_count`** can flag a period where several
+  currencies are reacting to the same shock almost simultaneously — fast,
+  feedback-like moves where it's genuinely hard to say who's "in the
+  driver's seat."
+- The most useful way to build intuition here is to look at what the density
+  series did around known events (a rate decision, an NFP release, a
+  geopolitical shock) and use those as reference points for what a "stress
+  day" looks like in this particular dataset — then watch for similar-looking
+  days going forward.
+
+### Reading direction flips
+
+`find-direction-flips` is the closest thing to a change log for the network.
+Each row is worth asking "what changed in the world that day?":
+
+- **`no_edge` → anything else** — a relationship just switched on. Worth
+  asking what new common driver might be linking these two pairs.
+- **Anything → `no_edge`** — two pairs that were linked just decoupled,
+  often because one of them had an idiosyncratic move (its own news, not a
+  shared driver) that broke the prior co-movement.
+- **`i->j` → `j->i`** (or vice versa) — leadership swapped. Worth checking
+  whether the news flow shifted from one currency's calendar to the other's.
+- **Anything → `i<->j`**, or `i<->j` → a single direction — the timing
+  structure between the two shifted. Take this one gently; see the note on
+  persistence below.
+- **A pair with several flips clustered close together in time** is a pair
+  that's newly "in play" — worth extra attention, and extra caution, since a
+  still-forming relationship is less trustworthy than a long-stable one.
+
+The single most important caveat: **a lone, one-day flip is more likely
+statistical noise than a real regime change.** Granger tests sitting near the
+FDR significance boundary can flicker in and out from one window to the next
+just from sampling noise. Treat a flip as meaningful once it *persists*
+across a few consecutive dates, not the moment it first appears — and always
+sanity-check a surprising link against known macro context (an actual news
+event, a data release, a central bank decision) before acting on it. This
+system finds statistical structure; it doesn't know *why* that structure
+exists.
+
 ## Project layout
 
 ```
