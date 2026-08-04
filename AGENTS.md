@@ -13,15 +13,26 @@ FX pairs (`EUR/USD`, `GBP/USD`, `USD/JPY`, `USD/CHF`, `USD/CAD`, `AUD/USD`,
 3. Fits an undirected partial-correlation skeleton via graphical lasso (`network.fit_skeleton`).
 4. Orients each skeleton edge with pairwise Granger causality, BH-FDR corrected
    across the window's tests (`network.infer_direction`).
-5. Writes one row per `(date, pair_i, pair_j)` edge to `output/edges.parquet` (`pipeline.py`).
+5. Writes one row per `(date, pair_i, pair_j)` edge to a parquet file (`pipeline.py`).
+6. Optionally renders the most recent date's graph as a PNG via Graphviz (`render_graph.py`).
+
+All of this is driven through a single CLI, `src/fx_bn/cli.py` (entry point `fx-bn`,
+also runnable as `python -m fx_bn.cli`) with one subcommand per stage.
 
 ## Setup
 
+This project's `.venv` is `uv`-managed (`pyvenv.cfg` shows `uv = ...`) — there is no
+`pip` inside it. Use `uv`, not `pip`, for all dependency work here:
+
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+uv sync --extra dev
 cp .env.example .env   # fill in INFLUXDB_URL / INFLUXDB_TOKEN / INFLUXDB_ORG / INFLUXDB_BUCKET
 ```
+
+`uv sync` alone omits the `dev` extra (drops `pytest`) — always pass `--extra dev`
+in this repo. `render-graph` also needs the system Graphviz binaries with the
+neato-family layout plugin installed (`libgvplugin-neato-layout8` on Debian/Ubuntu;
+`dot -v` should list `circo`/`neato` under `layout`, not just `dot`).
 
 InfluxDB credentials are required to run the pipeline against real data, but
 are **not** required to run the test suite — tests build DataFrames in memory
@@ -30,9 +41,10 @@ and never touch `influx_client`.
 ## Common commands
 
 ```bash
-pytest                              # run the test suite
-python scripts/run_pipeline.py      # full pipeline, full history since 2015
-python scripts/run_pipeline.py --days 30   # quick smoke test, last 30 days only
+pytest                                                  # run the test suite
+fx-bn run-pipeline --output output/edges.parquet        # full pipeline, full history since 2015
+fx-bn run-pipeline --output output/edges.parquet --days 30   # quick smoke test, last 30 days only
+fx-bn render-graph --input output/edges.parquet --output output/graph.png   # PNG of the most recent graph
 ```
 
 ## Conventions to preserve

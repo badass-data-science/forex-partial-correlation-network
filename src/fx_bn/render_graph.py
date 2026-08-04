@@ -1,10 +1,5 @@
-#!/usr/bin/env python
-"""Render the most recent graph in a time-varying edge-table parquet as a PNG,
-via Graphviz (force-directed neato layout, curved spline edges)."""
-
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 
 import graphviz
@@ -120,13 +115,3 @@ def render(input_path: Path, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     rendered = Path(dot.render(filename=output_path.stem, directory=str(output_path.parent), format='png', cleanup=True))
     rendered.replace(output_path)
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--input', type=Path, required=True, help='Edge-table parquet produced by scripts/run_pipeline.py')
-    parser.add_argument('--output', type=Path, required=True, help='PNG output path')
-    args = parser.parse_args()
-
-    render(args.input, args.output)
-    print(f'Wrote {args.output}')

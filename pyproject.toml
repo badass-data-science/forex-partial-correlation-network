@@ -17,6 +17,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest"]
 
+[project.scripts]
+fx-bn = "fx_bn.cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
