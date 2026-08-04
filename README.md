@@ -402,7 +402,7 @@ maps to something you'd want to know at a glance:
 
 An example, rendered for 2026-07-08:
 
-<img src="blog-posts/graph-2026-07-08.png" width="830" alt="FX partial-correlation network graph for 2026-07-08, rendered by fx-pcn's render-graph command" />
+<img src="blog-posts/graph-2026-07-08.png" width="415" alt="FX partial-correlation network graph for 2026-07-08, rendered by fx-pcn's render-graph command" />
 
 AUD/USD–NZD/USD is that day's strongest edge (`+0.57`, thick and blue); EUR/USD–USD/CHF is the one bidirected pair (`-0.37`, arrowheads on both ends); most of the rest are plain undirected lines — a real edge, but no clear lead-lag.
 
