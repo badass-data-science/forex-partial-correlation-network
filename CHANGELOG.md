@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Suppressed a numpy `RuntimeWarning` ("invalid value encountered in
+  subtract") that could leak from `fit_skeleton` during `run-pipeline`.
+  Root-caused by hand against a real offending window (2015-01-11): the
+  input going into `GraphicalLassoCV.fit()` had no NaN/inf/zero-variance
+  columns, and `precision_` came out fully finite regardless -- the warning
+  is a side effect of the solver's internal coordinate descent not
+  converging within its iteration cap on a numerically stiff (collinear)
+  window, the same root cause as the `ConvergenceWarning` already suppressed
+  alongside it, not a sign of corrupted output.
+
 ### Added
 - GitHub Actions CI (`.github/workflows/ci.yml`): runs `ruff check`,
   `ruff format --check`, `mypy`, and `pytest` on every push to `main` and
