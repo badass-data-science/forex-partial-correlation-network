@@ -2,6 +2,7 @@
 name = "fx-bn"
 version = "0.1.0"
 description = "Time-varying Bayesian-network-style graph over the 7 major FX pairs"
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "influxdb-client",
