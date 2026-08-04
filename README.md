@@ -1,5 +1,7 @@
 # fx-pcn
 
+[![CI](https://github.com/badass-data-science/forex-partial-correlation-network/actions/workflows/ci.yml/badge.svg)](https://github.com/badass-data-science/forex-partial-correlation-network/actions/workflows/ci.yml)
+
 A time-varying partial-correlation network, with Granger-causal edge
 direction, over the 7 major FX pairs (`EUR/USD`, `GBP/USD`, `USD/JPY`,
 `USD/CHF`, `USD/CAD`, `AUD/USD`, `NZD/USD`).

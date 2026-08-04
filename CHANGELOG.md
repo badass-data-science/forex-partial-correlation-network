@@ -7,9 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- GitHub Actions CI (`.github/workflows/ci.yml`): runs `ruff check`,
+  `ruff format --check`, `mypy`, and `pytest` on every push to `main` and
+  every pull request, across Python 3.11 and 3.13. README badge added.
 - `ruff` (lint + format) and `mypy` (type-checking, `disallow_untyped_defs`) as
   dev dependencies, configured in `pyproject.toml`. `src/fx_pcn` is fully
-  type-hinted and passes both clean; no CI wiring yet.
+  type-hinted and passes both clean.
 - Graphviz-based PNG rendering of the most recent graph in an edge-table
   parquet (`fx_pcn.render_graph`), force-directed `neato` layout with curved
   splines, edges colored by partial-correlation sign and weighted by magnitude.
