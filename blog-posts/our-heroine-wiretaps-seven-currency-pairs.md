@@ -39,7 +39,7 @@ Both are next on the list, which our heroine is choosing to announce publicly, m
 
 ## Conclusion
 
-An villainous empire this size cannot be run on vibes and pairwise correlation, so pipeline tells our heroine, refit daily, which of her seven currency pair henchmen are conditionally entangled net of the other five, which one is giving the orders when a relationship has a clear direction, and which ones are just quietly running each other in a loop that no org chart was ever going to capture.
+Any villainous empire this size cannot be run on vibes and pairwise correlation, so this pipeline tells our heroine, refit daily, which of her seven currency pair henchmen are conditionally entangled net of the other five, which one is giving the orders when a relationship has a clear direction, and which ones are just quietly running each other in a loop that no org chart was ever going to capture.
 
 # Code
 
