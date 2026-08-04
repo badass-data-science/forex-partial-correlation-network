@@ -1,4 +1,4 @@
-# Our Heroine Wiretaps Seven Currency Henchmen
+# Our Heroine Wiretaps Seven Currency Pairs
 
 ### Building a Time-Varying Partial-Correlation Network with Granger-Causal Direction Over the Seven Major FX Pairs — And Owning Up to a Naming Mistake in Front of the Entire Henchman Roster
 
