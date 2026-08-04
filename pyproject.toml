@@ -3,6 +3,7 @@ name = "fx-pcn"
 version = "0.1.0"
 description = "Time-varying partial-correlation network with Granger-causal edge direction, over the 7 major FX pairs"
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
     "influxdb-client",
