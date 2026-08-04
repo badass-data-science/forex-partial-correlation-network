@@ -400,6 +400,12 @@ maps to something you'd want to know at a glance:
 | **Arrowheads on both ends** | Each pair seems to lead the other. Treat this one with a little extra skepticism — fast-moving, simultaneous reactions to shared news can produce this pattern even without a genuine two-way feedback loop |
 | **Where a pair sits in the picture** | The layout is force-directed: pairs with more and stronger connections get pulled toward the center, and isolated pairs drift to the outside. A pair sitting in the middle of a busy image is that day's "hub" — the one whose moves are rippling most broadly through the majors |
 
+An example, rendered for 2026-07-08:
+
+<img src="blog-posts/graph-2026-07-08.png" width="830" alt="FX partial-correlation network graph for 2026-07-08, rendered by fx-pcn's render-graph command" />
+
+AUD/USD–NZD/USD is that day's strongest edge (`+0.57`, thick and blue); EUR/USD–USD/CHF is the one bidirected pair (`-0.37`, arrowheads on both ends); most of the rest are plain undirected lines — a real edge, but no clear lead-lag.
+
 A good habit: before reading anything into a specific edge, check whether it's
 been stable across the last few days' images (or the `find-direction-flips`
 output — see below) rather than trusting a single day's picture. Any one day's
