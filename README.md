@@ -37,8 +37,16 @@ not just `dot`.
 
 ## Configuration
 
-The pipeline reads FX bar data from InfluxDB. These environment variables must
-already be set in the shell you run `fx-pcn` from — there is no `.env` file:
+The pipeline reads FX bar data from InfluxDB, but doesn't populate it —
+that's the job of a separate repo,
+[`ETL-forex-time-series-data`](https://github.com/badass-data-science/ETL-forex-time-series-data),
+which pulls raw FX bars and writes them into InfluxDB in the wide,
+forward-filled form `fx_pcn.influx_client`/`data.py` expect. Run that
+pipeline (or otherwise populate a compatible InfluxDB bucket) before running
+`fx-pcn` against real data.
+
+These environment variables must already be set in the shell you run
+`fx-pcn` from — there is no `.env` file:
 
 ```
 INFLUXDB_URL
