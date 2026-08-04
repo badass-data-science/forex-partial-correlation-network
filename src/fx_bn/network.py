@@ -152,18 +152,45 @@ def build_edge_table(
     min_observations: int = config.MIN_OBSERVATIONS_PER_WINDOW,
     max_lag: int = config.MAX_LAG,
     fdr_alpha: float = config.FDR_ALPHA,
+    granularity: str = config.GRANULARITY,
 ) -> pd.DataFrame:
     """The full time-varying network: one row per (date, pair_i, pair_j) edge.
 
     Filtering to a single `date` gives that day's individual graph -- nodes are
     the 7 pairs, edges are the rows for that date.
+
+    Every row also carries the window/step/lag/alpha/granularity settings it
+    was built with, so edge tables from runs with different settings remain
+    distinguishable (and filterable) even if later concatenated together.
+    `granularity` isn't used by the fitting logic here -- it's threaded through
+    purely to be recorded alongside the parameters that are.
     """
     rows: list[dict] = []
     for date, window in rolling_windows(returns_df, window_days, step_days, min_observations):
         skeleton = fit_skeleton(window)
         for record in infer_direction(window, skeleton, max_lag, fdr_alpha):
             record['date'] = date.date()
+            record['window_days'] = window_days
+            record['step_days'] = step_days
+            record['min_observations'] = min_observations
+            record['max_lag'] = max_lag
+            record['fdr_alpha'] = fdr_alpha
+            record['granularity'] = granularity
             rows.append(record)
 
-    columns = ['date', 'pair_i', 'pair_j', 'partial_corr', 'granger_p_i_to_j', 'granger_p_j_to_i', 'direction']
+    columns = [
+        'date',
+        'pair_i',
+        'pair_j',
+        'partial_corr',
+        'granger_p_i_to_j',
+        'granger_p_j_to_i',
+        'direction',
+        'window_days',
+        'step_days',
+        'min_observations',
+        'max_lag',
+        'fdr_alpha',
+        'granularity',
+    ]
     return pd.DataFrame(rows, columns=columns)
