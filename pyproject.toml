@@ -13,6 +13,7 @@ dependencies = [
     "statsmodels",
     "pyarrow",
     "graphviz",
+    "rdflib>=7.6.0",
 ]
 
 [project.optional-dependencies]
