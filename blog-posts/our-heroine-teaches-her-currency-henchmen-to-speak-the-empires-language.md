@@ -1,0 +1,57 @@
+# Our Heroine Teaches Her Currency Henchmen to Speak the Empire's Language
+
+### Why RDF Output Exists, What a Knowledge Graph Actually Is, and How Seven Currency Pairs Learned to File Paperwork the Rest of the Organization Can Read
+
+Our heroine's currency-pair conspiracy tracker has, by this point, produced a very satisfying parquet file. Every day, seven henchmen — EUR/USD, GBP/USD, USD/JPY, USD/CHF, USD/CAD, AUD/USD, NZD/USD — get their alliances re-litigated, their partial correlations recomputed, their Granger-causal chains of command reassigned. It is, by any reasonable standard, an excellent piece of internal surveillance. It is also, from the perspective of the rest of the empire, completely illegible. A parquet file is a ledger written in a dialect only the department that produced it can read fluently — you need to already know that `pair_i` and `pair_j` mean what they mean, that `direction` is a string that sometimes contains an arrow, that a missing row means "no edge" and not "no data." Every other department — the strategic-intelligence division that reads the news, the resume-hacking division that catalogs skills and experience — keeps its own ledger in its own dialect too, and none of them can currently be read by anyone outside their own filing cabinet. This is the story of teaching one of those filing cabinets to speak a language the rest of the building already understands.
+
+## The Problem: Every Department Keeps Its Own Ledger
+
+A parquet file, or a CSV, or a SQL table, is a closed dialect. Its meaning lives outside the file — in a schema some human wrote down once, in column names that are only self-explanatory to whoever already knows the project. Reading it requires a bespoke parser: this column is a date, this one's a signed float, this string sometimes means two different things depending on whether it contains an arrow character. That's a fine arrangement when exactly one department ever reads the file. It becomes a real liability the moment two departments want to ask a question that spans both of their filing cabinets — "did the currency conspiracy shift on the same days the news division was covering a central bank meeting" is not a question either department's schema was built to answer, and it never will be, because their schemas don't know the other one exists.
+
+RDF (Resource Description Framework) fixes this by making meaning part of the data instead of a side document someone has to already know. Every fact becomes a **triple** — subject, predicate, object — and every subject and predicate is a URI, a globally unique name, not a column position in a table only meaningful within that table. `EUR/USD has partial correlation -0.23 with USD/CAD` isn't a row three columns deep in a file called `edges.parquet`; it's a fact anyone can retrieve, decorate further, or link to a fact from an entirely different file, because the things it's about — `EUR/USD`, `USD/CAD`, "partial correlation" itself — have real, dereferenceable names rather than private, in-file conventions.
+
+## What a Knowledge Graph Actually Is
+
+Stack enough triples on top of each other and what you get is a **knowledge graph**: not a database with a fixed row-and-column shape, but a web of typed facts about typed entities, where the "schema" is just whatever properties happen to have been asserted about a given thing so far. Adding a new fact about `EUR/USD` — a new relationship, a new piece of metadata, a link into an entirely different project's vocabulary — never requires an `ALTER TABLE` or a migration. It's just one more triple, and every consumer that already knows how to walk a graph knows how to find it. That's the part that makes cross-department questions tractable in the first place: two departments' knowledge graphs don't need to be merged, restructured, or made schema-compatible before they can be reasoned over together. They only need to share, at the handful of points where their subject matter actually overlaps, an agreement about what a given URI *means*.
+
+## Why fx-pcn Needed Its Own Ontology (and Where It Borrowed Instead)
+
+Nothing standard describes "time-varying partial-correlation network with Granger-causal edge direction" — this is not a well-known enough kind of fact for RDFS, Schema.org, or any other off-the-shelf vocabulary to have already named it. So `fx-pcn`'s RDF export mints a small custom ontology, the `fxpcn:` namespace: `EdgeObservation` for one `(date, pair_i, pair_j)` row, `NetworkSnapshot` for a day's density summary, `DirectionFlip` for a changed relationship, and a small handful of properties on each. This is the same kind of admission the "not actually a Bayesian network" chapter of this project already made once — sometimes the honest move is inventing exactly the vocabulary the data needs, rather than forcing it into a standard that almost, but doesn't quite, fit.
+
+What isn't invented is provenance. "Which pipeline run, with which parameters, produced this fact" is an extremely well-trodden problem, and PROV-O already solves it properly — so every `EdgeObservation` points at a `prov:Activity` node via `prov:wasGeneratedBy`, one `Activity` per distinct `(window_days, step_days, min_observations, max_lag, fdr_alpha, granularity)` combination rather than one per row, so a full-history run's 66,000-odd edges share a single provenance node instead of repeating the same six numbers 66,000 times. Reusing PROV-O here instead of rolling a `fxpcn:producedBy` property of our own means any tool that already understands provenance — and a great many do — understands this data's provenance too, for free.
+
+## Teaching the Currency Henchmen to Use the Same Words as Everyone Else
+
+Here's where it gets genuinely interesting, and where a naive approach would have failed outright. The obvious next step, once you have a knowledge graph of currency pairs, is wanting to connect it to the *other* knowledge graph the empire already maintains — a nightly intelligence pipeline that reads the news and tags it with concepts like "European Central Bank" or "interest rate." The tempting move is to try to link `EUR/USD` directly to whatever that pipeline calls the Eurozone. It doesn't work, and it's worth explaining why, because the failure mode is instructive: linking two knowledge graphs together generally means deciding whether two differently-labeled things are *the same concept* — a matching problem, usually solved with string-similarity search and a human or an LLM adjudicating the ambiguous cases. But "EUR/USD" and "European Central Bank" were never the same concept to begin with. No amount of clever string matching finds a link that isn't an identity claim in the first place; asking a same-concept-detector to find a completely different kind of relationship is asking it to fail.
+
+The fix was to stop trying to match a ticker symbol against a news vocabulary at all, and instead insert the fact that actually mediates the two: every currency has exactly one issuing region and, often, one central bank, and that's not a matching problem, it's just static, hand-authored knowledge with zero ambiguity — EUR issues from the European Union and the European Central Bank, USD from the United States and the Federal Reserve, and so on for all eight currencies across the seven pairs. Only *those* new nodes — "European Union," "Federal Reserve," genuinely fuzzy, genuinely nameable real-world entities — get typed as `skos:Concept` with a `skos:prefLabel`, deliberately matching the exact vocabulary convention the empire's concept-linking infrastructure already expects, rather than another custom `fxpcn:` type. That's the part that turns "impossible matching problem" into "already-solved matching problem": once the mediating entity exists and speaks SKOS, the existing linking machinery can do what it was built for.
+
+This wasn't left to guesswork, either. Before deciding which of "issuing region," "issuing institution," or "currency name" was worth minting, the actual target vocabulary — a real, 7,635-concept knowledge graph built from RSS news feeds — got checked by hand. Region names turned out to be a clean sweep: all eight currencies' countries or blocs exist as exact-string concepts. Institution names were a genuine mixed bag: the Federal Reserve, the European Central Bank, the Bank of England, and the Bank of Japan are all there; the Bank of Canada, the Swiss National Bank, and the Australian and New Zealand reserve banks are not. Worse than simply missing, the Royal Bank of Canada — a commercial bank, not a central bank, and not the same institution at all — *is* present, which would have been a textbook false-friend trap for a label-similarity linker if "Bank of Canada" had been minted anyway and gotten matched to the wrong entity. So four currencies get an institution link and four don't, and none of them get a currency-name link at all, because checking first found that field of the vocabulary essentially empty. Guessing at which framing would work and shipping it anyway would have produced a knowledge graph confidently wrong in a way nobody would have noticed until it mismatched something in production.
+
+## What This Isn't, Yet
+
+To be precise about scope: this produces a file, full stop. Nothing here loads it into Neo4j, and nothing here registers it with the empire's concept-linking hub or spends a single LLM call adjudicating anything — that hub-registration step is a deliberate, separate, not-yet-taken decision, not a missing feature. What exists today is a `.ttl` file our heroine can hand to that infrastructure later, built so that handoff costs nothing when it happens: the region/institution layer already speaks the hub's own vocabulary, and the module that builds it was written with an eye toward being lifted into its own small repository someday, since "which country and central bank issues each currency" is really general reference knowledge that has nothing specifically to do with partial correlation networks — it just happens to live here for now, because there's exactly one consumer of it and standing up a second repository for eight facts would have been solving a problem that doesn't exist yet.
+
+## Conclusion
+
+A knowledge graph is what happens when a department stops writing its ledger in a private dialect and starts writing it in a language the rest of the building can already parse — not by merging every department's records into one incoherent pile, but by making each fact self-describing enough that connecting two of them, when it's actually warranted, costs one new triple instead of a rewritten schema. Our heroine's seven currency henchmen can now file their daily conspiracy reports in a format the rest of the empire could, in principle, cross-reference against the news — and, just as importantly, in a format that says plainly where the confident claims end and the "we checked, and honestly, we don't have that one" begins.
+
+# Code
+
+Code implementing this project is available [here](https://github.com/badass-data-science/forex-partial-correlation-network).
+
+# AI Use Statement
+
+This post was initially drafted by Claude at the author's direction, working from this project's own README, AGENTS.md, and CHANGELOG.md, and then revised by a human before publication.
+
+## Tags
+
+- Data Science
+- Python
+- RDF
+- Knowledge Graphs
+- Semantic Web
+- SKOS
+- PROV-O
+- Forex
+- Quantitative Finance

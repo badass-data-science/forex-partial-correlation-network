@@ -3,19 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-from rdflib import RDF, XSD, Graph, Literal, Namespace, URIRef
+from rdflib import RDF, XSD, Graph, Literal, URIRef
 from rdflib.namespace import PROV
 
-# Small custom ontology -- nothing standard covers "time-varying
-# partial-correlation network," so this mints just the handful of terms that
-# need it, reusing PROV-O for provenance rather than inventing that too. The
-# `.local` base IRIs match the convention the graph-nexus project already
-# uses for its registered sources' `--base-iri` (e.g.
-# https://strategic-reports.local/kg/), so this would slot in consistently
-# if it were ever registered as a graph-nexus source -- not something this
-# module does itself.
-FXPCN = Namespace('https://fx-pcn.local/ontology#')
-KG = Namespace('https://fx-pcn.local/kg/')
+from fx_pcn import macro_vocabulary
+from fx_pcn.ontology import FXPCN, KG
 
 _RUN_PARAM_COLUMNS = [
     'window_days',
@@ -47,10 +39,16 @@ def _bind_namespaces(graph: Graph) -> None:
 
 
 def _add_pairs(graph: Graph, pairs: set[str]) -> None:
+    currency_codes = {code for pair in pairs for code in pair.split('/')}
+    currencies = macro_vocabulary.add_currencies(graph, currency_codes)
+
     for pair in pairs:
         uri = _pair_uri(pair)
         graph.add((uri, RDF.type, FXPCN.CurrencyPair))
         graph.add((uri, FXPCN.label, Literal(pair)))
+        base, quote = pair.split('/')
+        graph.add((uri, FXPCN.baseCurrency, currencies[base]))
+        graph.add((uri, FXPCN.quoteCurrency, currencies[quote]))
 
 
 def _add_activities(graph: Graph, edges: pd.DataFrame) -> dict[tuple, URIRef]:

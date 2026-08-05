@@ -20,6 +20,10 @@ rolling window of H1 bars it:
 6. Optionally renders the most recent date's graph as a PNG via Graphviz (`render_graph.py`).
 7. Optionally exports the edge table (plus density/direction-flips) as RDF/Turtle
    (`rdf_export.py`) -- output only, nothing here loads it into a triple store.
+   Includes a static currency -> region/institution vocabulary layer
+   (`macro_vocabulary.py`; shared RDF namespace constants in `ontology.py`,
+   split out to avoid a circular import between the two) designed to be
+   extractable into its own repo later if it's ever reused outside fx-pcn.
 
 All of this is driven through a single CLI, `src/fx_pcn/cli.py` (entry point `fx-pcn`,
 also runnable as `python -m fx_pcn.cli`) with one subcommand per stage.

@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `export-rdf` now also mints a static currency -> region/institution
+  vocabulary layer (`fx_pcn.macro_vocabulary`): `fxpcn:Currency` per
+  currency code, linked from each `CurrencyPair` via `fxpcn:baseCurrency`/
+  `fxpcn:quoteCurrency`, and linked to `skos:Concept`/`skos:prefLabel`
+  region (always) and institution (only EUR/USD/GBP/JPY, where a real
+  concept-vocabulary match was confirmed) nodes -- reusing SKOS directly,
+  unlike the rest of the `fxpcn:` ontology, so this layer could be
+  registered with `graph-nexus` with no conversion step. Shared RDF
+  namespace constants moved to a new `fx_pcn.ontology` module to avoid a
+  circular import; the module is deliberately written to have no
+  fx-pcn-specific dependencies beyond that, in case it's split into its own
+  repo later.
 - `export-rdf`: turns an edge table (plus optional `compute-density`/
   `find-direction-flips` output) into a single RDF/Turtle file
   (`fx_pcn.rdf_export`), output-only -- no triple-store loading. Mints a
