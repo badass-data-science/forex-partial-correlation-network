@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `export-rdf`: turns an edge table (plus optional `compute-density`/
+  `find-direction-flips` output) into a single RDF/Turtle file
+  (`fx_pcn.rdf_export`), output-only -- no triple-store loading. Mints a
+  small custom `fxpcn:` ontology (`CurrencyPair`, `EdgeObservation`,
+  `NetworkSnapshot`, `DirectionFlip`), reusing PROV-O for provenance
+  (`prov:Activity`/`prov:wasGeneratedBy` per distinct run-parameter
+  combination) rather than inventing that part too. `fxpcn:source`/
+  `fxpcn:target` are only asserted on genuinely directed edges; bidirected
+  and undirected edges rely on the always-present, unordered `fxpcn:pairA`/
+  `fxpcn:pairB` instead.
+
 ### Fixed
 - Suppressed a numpy `RuntimeWarning` ("invalid value encountered in
   subtract") that could leak from `fit_skeleton` during `run-pipeline`.

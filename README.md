@@ -85,6 +85,9 @@ fx-pcn run-pipeline --output output/edges.parquet --append
 
 # Render the most recent date's graph as a PNG
 fx-pcn render-graph --input output/edges.parquet --output output/graph.png
+
+# Export the edge table (and optionally density/direction-flips) as RDF/Turtle
+fx-pcn export-rdf --edges output/edges.parquet --output output/graph.ttl
 ```
 
 `run-pipeline` options (all optional except `--output`):
@@ -377,6 +380,54 @@ Both commands are pure functions of the edge table (`fx_pcn.density.compute_dens
 `run()` — no InfluxDB access, so they're fast and fully covered by synthetic-data
 tests. A planned next step is a daily report synthesizing both of these into a
 single human-readable summary; not built yet.
+
+### RDF export
+
+`export-rdf` turns an edge table -- and, optionally, its `compute-density`
+and/or `find-direction-flips` output -- into a single RDF/Turtle file:
+
+```bash
+fx-pcn export-rdf --edges output/edges.parquet --output output/graph.ttl
+
+# Optionally fold in density/direction-flips too:
+fx-pcn export-rdf \
+  --edges output/edges.parquet \
+  --density output/density.parquet \
+  --flips output/flips.parquet \
+  --output output/graph.ttl
+```
+
+Only `--edges` and `--output` are required; `--density`/`--flips` are
+optional and each adds its own node type to the same file if given. This
+module's only job is producing that `.ttl` file -- nothing here loads it into
+a triple store, Neo4j or otherwise; that's left as a separate, optional step
+for whatever's consuming it.
+
+There's no standard vocabulary for "time-varying partial-correlation
+network," so this mints a small custom ontology (the `fxpcn:` namespace)
+rather than forcing the data into a vocabulary that doesn't actually fit,
+reusing [PROV-O](https://www.w3.org/TR/prov-o/) for provenance rather than
+inventing that part too:
+
+| Node | Meaning |
+|---|---|
+| `fxpcn:CurrencyPair` | One of the 7 majors (e.g. `kg:pair/EURUSD`), with an `fxpcn:label` (e.g. `"EUR/USD"`) |
+| `fxpcn:EdgeObservation` | One per edge-table row: `fxpcn:date`, `fxpcn:pairA`/`fxpcn:pairB` (always present, unordered), `fxpcn:partialCorrelation`, `fxpcn:direction`, `fxpcn:grangerPValuePairAToPairB`/`...PairBToPairA` |
+| `fxpcn:NetworkSnapshot` | One per `compute-density` row: `fxpcn:date`, `fxpcn:edgeCount`, `fxpcn:density`, `fxpcn:meanAbsPartialCorrelation`, and the directed/bidirected/undirected counts |
+| `fxpcn:DirectionFlip` | One per `find-direction-flips` row: `fxpcn:date`, `fxpcn:pairA`/`fxpcn:pairB`, `fxpcn:previousDirection`, `fxpcn:newDirection` |
+| `prov:Activity` | One per distinct `(window_days, step_days, min_observations, max_lag, fdr_alpha, granularity)` combination present in the edge table, pointed at by every `EdgeObservation` it produced via `prov:wasGeneratedBy` |
+
+`fxpcn:source`/`fxpcn:target` are only added to an `EdgeObservation` when its
+`direction` names a single unambiguous leader (`i->j` or `j->i`) — a
+bidirected (`i<->j`) row has no single source/target to assert without
+inventing an ordering RDF can't actually preserve as two independent
+multi-valued properties on the same node, so it's left to the always-present,
+unordered `fxpcn:pairA`/`fxpcn:pairB` plus the `fxpcn:direction` literal
+itself. No links are drawn between a date's `NetworkSnapshot`/`DirectionFlip`s
+and that date's individual `EdgeObservation`s either — the shared `fxpcn:date`
+literal is enough for a consumer to join across them, and it keeps each
+table's export as independent as the pure functions that produced the tables
+themselves.
 
 ## Interpreting the results
 

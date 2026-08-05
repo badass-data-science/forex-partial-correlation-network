@@ -18,6 +18,8 @@ rolling window of H1 bars it:
    across the window's tests (`network.infer_direction`).
 5. Writes one row per `(date, pair_i, pair_j)` edge to a parquet file (`pipeline.py`).
 6. Optionally renders the most recent date's graph as a PNG via Graphviz (`render_graph.py`).
+7. Optionally exports the edge table (plus density/direction-flips) as RDF/Turtle
+   (`rdf_export.py`) -- output only, nothing here loads it into a triple store.
 
 All of this is driven through a single CLI, `src/fx_pcn/cli.py` (entry point `fx-pcn`,
 also runnable as `python -m fx_pcn.cli`) with one subcommand per stage.

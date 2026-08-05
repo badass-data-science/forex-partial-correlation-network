@@ -5,7 +5,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from fx_pcn import config, density, direction_flips, render_graph
+from fx_pcn import config, density, direction_flips, rdf_export, render_graph
 from fx_pcn.influx_client import DEFAULT_START
 from fx_pcn.pipeline import run as run_pipeline
 
@@ -48,6 +48,16 @@ def _compute_density(args: argparse.Namespace) -> None:
 def _find_direction_flips(args: argparse.Namespace) -> None:
     result = direction_flips.run(args.input, args.output, append=args.append)
     print(result.tail(20))
+
+
+def _export_rdf(args: argparse.Namespace) -> None:
+    graph = rdf_export.run(
+        edges_path=args.edges,
+        output_path=args.output,
+        density_path=args.density,
+        flips_path=args.flips,
+    )
+    print(f'Wrote {len(graph)} triples to {args.output}')
 
 
 def _add_run_pipeline_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -164,6 +174,30 @@ def _add_find_direction_flips_parser(subparsers: argparse._SubParsersAction) -> 
     parser.set_defaults(handler=_find_direction_flips)
 
 
+def _add_export_rdf_parser(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser(
+        'export-rdf',
+        help='Export an edge table (plus optional density/direction-flips tables) as RDF/Turtle',
+    )
+    parser.add_argument(
+        '--edges', type=Path, required=True, help='Edge-table parquet produced by run-pipeline'
+    )
+    parser.add_argument(
+        '--density',
+        type=Path,
+        default=None,
+        help='Optional density-table parquet produced by compute-density',
+    )
+    parser.add_argument(
+        '--flips',
+        type=Path,
+        default=None,
+        help='Optional direction-flips-table parquet produced by find-direction-flips',
+    )
+    parser.add_argument('--output', type=Path, required=True, help='Turtle (.ttl) output path')
+    parser.set_defaults(handler=_export_rdf)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog='fx-pcn')
     subparsers = parser.add_subparsers(dest='command', required=True)
@@ -171,6 +205,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_render_graph_parser(subparsers)
     _add_compute_density_parser(subparsers)
     _add_find_direction_flips_parser(subparsers)
+    _add_export_rdf_parser(subparsers)
     return parser
 
 
