@@ -4,6 +4,7 @@ import pandas as pd
 from rdflib import RDF, XSD, Literal
 from rdflib.namespace import PROV
 
+from fx_pcn.macro_vocabulary import _currency_uri
 from fx_pcn.rdf_export import FXPCN, _pair_uri, build_graph
 
 _RUN_PARAMS = {
@@ -43,6 +44,16 @@ def test_directed_edge_gets_source_and_target():
     assert (obs, FXPCN.pairB, _pair_uri('USD/CAD')) in graph
     assert (obs, FXPCN.partialCorrelation, Literal(-0.23, datatype=XSD.double)) in graph
     assert (obs, FXPCN.direction, Literal('EUR/USD->USD/CAD')) in graph
+
+
+def test_currency_pair_links_to_base_and_quote_currency():
+    edges = pd.DataFrame([_edges_row()])
+
+    graph = build_graph(edges)
+
+    pair = _pair_uri('EUR/USD')
+    assert (pair, FXPCN.baseCurrency, _currency_uri('EUR')) in graph
+    assert (pair, FXPCN.quoteCurrency, _currency_uri('USD')) in graph
 
 
 def test_bidirected_edge_has_no_source_or_target():

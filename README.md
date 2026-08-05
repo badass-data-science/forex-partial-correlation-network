@@ -411,7 +411,8 @@ inventing that part too:
 
 | Node | Meaning |
 |---|---|
-| `fxpcn:CurrencyPair` | One of the 7 majors (e.g. `kg:pair/EURUSD`), with an `fxpcn:label` (e.g. `"EUR/USD"`) |
+| `fxpcn:CurrencyPair` | One of the 7 majors (e.g. `kg:pair/EURUSD`), with an `fxpcn:label` (e.g. `"EUR/USD"`) and `fxpcn:baseCurrency`/`fxpcn:quoteCurrency` pointing at its two `fxpcn:Currency` entities |
+| `fxpcn:Currency` | One per currency code (8 for the default 7-pair universe), with `fxpcn:region` (always) and `fxpcn:institution` (only where one exists — see below) pointing at `skos:Concept` nodes |
 | `fxpcn:EdgeObservation` | One per edge-table row: `fxpcn:date`, `fxpcn:pairA`/`fxpcn:pairB` (always present, unordered), `fxpcn:partialCorrelation`, `fxpcn:direction`, `fxpcn:grangerPValuePairAToPairB`/`...PairBToPairA` |
 | `fxpcn:NetworkSnapshot` | One per `compute-density` row: `fxpcn:date`, `fxpcn:edgeCount`, `fxpcn:density`, `fxpcn:meanAbsPartialCorrelation`, and the directed/bidirected/undirected counts |
 | `fxpcn:DirectionFlip` | One per `find-direction-flips` row: `fxpcn:date`, `fxpcn:pairA`/`fxpcn:pairB`, `fxpcn:previousDirection`, `fxpcn:newDirection` |
@@ -428,6 +429,32 @@ and that date's individual `EdgeObservation`s either — the shared `fxpcn:date`
 literal is enough for a consumer to join across them, and it keeps each
 table's export as independent as the pure functions that produced the tables
 themselves.
+
+### The currency → region/institution vocabulary layer
+
+Each `fxpcn:Currency` also links to the region that issues it, and — where
+one meaningfully exists — the institution that sets its monetary policy
+(`src/fx_pcn/macro_vocabulary.py`, a static, hand-authored table, not
+derived from anything the pipeline computes). Unlike `CurrencyPair`, these
+region/institution nodes are typed `a skos:Concept` with `skos:prefLabel`
+rather than a custom `fxpcn:` type — matching the same
+`concept_type`/`label_property` convention the sibling
+[`graph-nexus`](https://github.com/badass-data-science/graph-nexus) project
+already uses for its registered sources, so this layer could be registered
+there directly with no conversion step (not something this repo does
+itself).
+
+Region is populated for all 8 currencies; institution only for EUR, USD,
+GBP, and JPY (European Central Bank, Federal Reserve, Bank of England, Bank
+of Japan) — CHF/CAD/AUD/NZD get no institution node at all, rather than a
+guessed one. This was checked against a real concept vocabulary (a
+`strategic-report-generator` knowledge graph derived from RSS news feeds,
+7,635 unique concept labels): `bank of canada`, `swiss national bank`,
+`reserve bank of australia`, and `reserve bank of new zealand` simply don't
+appear as concepts there, and — more importantly — `royal bank of canada`
+(a commercial bank, not the central bank) *does*, which would be a genuine
+false-friend risk for a label-similarity linker if `Bank of Canada` were
+minted anyway.
 
 ## Interpreting the results
 
