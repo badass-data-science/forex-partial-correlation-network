@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `fx_pcn.flows`: Prefect scheduling for four of the five parameter regimes
+  in README's "Other parameter regimes" table (all but event-conditioned),
+  running the full artifact chain (`run-pipeline --append` -> `compute-density
+  --append` -> `find-direction-flips --append` -> `render-graph` ->
+  `export-rdf`) every weekday at 6:30pm Eastern via
+  `CronSchedule(timezone="America/New_York")` -- DST-safe, unlike a
+  hand-computed fixed-UTC cron. Each regime is an independent deployment of
+  one parameterized flow, not one flow looping over regimes. Follows the
+  same shared-local-Prefect-server-plus-per-project-`.serve()`-process
+  convention as `ETL-forex-time-series-data`/`strategic-report-generator`.
+  Output filenames use the existing `<artifact>---window-days-N---...`
+  convention via a new `regime_output_path()` helper.
 - `export-rdf` now also mints a static currency -> region/institution
   vocabulary layer (`fx_pcn.macro_vocabulary`): `fxpcn:Currency` per
   currency code, linked from each `CurrencyPair` via `fxpcn:baseCurrency`/
