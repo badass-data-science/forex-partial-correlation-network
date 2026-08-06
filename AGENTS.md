@@ -40,6 +40,20 @@ rolling window of H1 bars it:
      --base-iri https://fx-pcn.local/kg/
    graph-nexus link fx-pcn --repo-root /home/emily/output/graph-nexus
    ```
+8. Optionally runs all of the above (steps 1-6, plus RDF export for regimes
+   that need it) automatically every weekday at 6:30pm Eastern, for four of
+   the five parameter regimes in README's "Other parameter regimes" table
+   (`flows.py`, Prefect -- see README's "Automated daily runs (Prefect)"
+   for the regime table, exact `REGIME_PARAMS` values, and the systemd
+   unit). Follows the same shared-local-server-plus-per-project-`.serve()`
+   convention as the sibling `ETL-forex-time-series-data` and
+   `strategic-report-generator` repos -- don't invent a different pattern
+   (e.g. a work pool/worker) without a reason. Granularity strings must
+   match InfluxDB's actual tag values exactly (OANDA's real codes: `H1`,
+   `H4`, `M15`, `D` -- no numeric suffix on `D`); a wrong string like `D1`
+   fails silently (an empty query result, not an error) rather than
+   raising, so don't assume a new regime works until it's actually been run
+   once against real data.
 
 All of this is driven through a single CLI, `src/fx_pcn/cli.py` (entry point `fx-pcn`,
 also runnable as `python -m fx_pcn.cli`) with one subcommand per stage.

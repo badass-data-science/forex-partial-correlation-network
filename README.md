@@ -293,8 +293,8 @@ horizons:
 |---|---|---|---|---|---|
 | **Default** | H1 | 5d | 1d | 4h | Intraweek lead-lag, e.g. session-overlap effects (London/NY) |
 | **Intraday/microstructure** | M15 or M5 | 1–2d | 1d (or intraday step) | 8–16 bars (~2–4h) | Session handoffs within a single day (Asia→London→NY), order-flow-driven co-movement |
-| **Macro/carry regime** | D1 | 30–90d | 5–7d | 1–5 days | Risk-on/risk-off comovement, carry-trade unwind dynamics — plays out over days, not hours |
-| **Policy-cycle regime** | D1 (or weekly resample) | 180d+ | 30d | 5–10 days | Central-bank rate-cycle-driven structure — e.g. USD/JPY vs USD/CAD relationships shifting across a hiking/cutting cycle |
+| **Macro/carry regime** | D | 30–90d | 5–7d | 1–5 days | Risk-on/risk-off comovement, carry-trade unwind dynamics — plays out over days, not hours |
+| **Policy-cycle regime** | D (or weekly resample) | 180d+ | 30d | 5–10 days | Central-bank rate-cycle-driven structure — e.g. USD/JPY vs USD/CAD relationships shifting across a hiking/cutting cycle |
 | **Event-conditioned** | H1 | short, anchored to calendar events | irregular (aligned to FOMC/NFP/ECB dates) | 1–4h | Whether the network's structure snaps to a different shape around scheduled macro releases |
 
 The general tradeoff across all of these: shorter windows/granularity are more
@@ -308,6 +308,86 @@ All but the event-conditioned row are just different `--window-days`/
 `--step-days`/`--granularity`/`--max-lag` values on the existing CLI — no code
 changes needed. The event-conditioned regime would need genuinely new logic
 (aligning windows to a macro calendar rather than stepping at a fixed interval).
+
+## Automated daily runs (Prefect)
+
+`src/fx_pcn/flows.py` runs the full artifact chain (`run-pipeline
+--append` → `compute-density --append` → `find-direction-flips --append` →
+`render-graph` → `export-rdf`) for four of the five regimes above — every
+regime except event-conditioned, which still needs the calendar-alignment
+logic noted above — every weekday at 6:30pm Eastern. Each regime is an
+independent Prefect deployment of the same flow, not one flow looping over
+all four, so re-running or debugging one never touches the others'
+schedules or history.
+
+`REGIME_PARAMS` in `flows.py` picks one concrete point inside each range
+from the table above (the table gives ranges, not exact values):
+
+| Regime | granularity | window_days | step_days | max_lag | min_observations |
+|---|---|---|---|---|---|
+| `default` | H1 | 5 | 1 | 4 | 60 |
+| `intraday` | M15 | 2 | 1 | 12 | 96 |
+| `macro` | D | 60 | 7 | 3 | 30 |
+| `policy` | D | 180 | 30 | 7 | 90 |
+
+Granularity is `D`, not `D1` — OANDA's actual daily granularity code has no
+numeric suffix (only sub-daily codes like `H1`/`M15` do); this tripped up
+an earlier version of this table too.
+
+Every artifact this produces lands in `~/output/forex-partial-correlation-network/`
+using the same `<artifact>---window-days-N---step-days-N---min-observations-N---max-lag-N---fdr-alpha-N---granularity-X.<ext>`
+naming already used for manual runs, via `regime_output_path()` — so a
+scheduled `macro` run and a manual `default` run never collide, and every
+file on disk is traceable to the exact regime that produced it without
+opening it.
+
+### Running the scheduler
+
+This follows the same pattern as the sibling `ETL-forex-time-series-data`
+and `strategic-report-generator` projects: one shared local Prefect server,
+one independent `.serve()` process per project (registered against that
+same server, not a separate one per project):
+
+```bash
+prefect server start                                    # if not already running
+prefect config set PREFECT_API_URL=http://localhost:4200/api
+python -m fx_pcn.flows                                  # keep this running
+```
+
+The process must stay alive — run it under `systemd` or in a
+`tmux`/`screen` session. Example unit
+(`/etc/systemd/system/fx-pcn-scheduler.service`):
+
+```ini
+[Unit]
+Description=fx-pcn Prefect scheduler
+After=network.target
+
+[Service]
+User=<your-user>
+WorkingDirectory=<project-root>
+EnvironmentFile=<project-root>/.env
+ExecStart=/path/to/venv/bin/python -m fx_pcn.flows
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Trigger a one-off run without waiting for the schedule:
+
+```bash
+prefect deployment run 'fx-pcn-regime-pipeline/fx-pcn-default'
+prefect deployment run 'fx-pcn-regime-pipeline/fx-pcn-macro'
+```
+
+**Backfill note**: `intraday`, `macro`, and `policy` have no existing
+output yet, so each one's *first* run is a full-history run, not an
+incremental `--append` — `intraday` (M15, back to 2015) in particular pulls
+a lot of data and takes noticeably longer than the others. Worth doing that
+first run manually ahead of the first scheduled 6:30pm run, not discovering
+it takes hours on a weekday evening for the first time.
 
 ## Output
 
