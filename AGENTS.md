@@ -24,6 +24,22 @@ rolling window of H1 bars it:
    (`macro_vocabulary.py`; shared RDF namespace constants in `ontology.py`,
    split out to avoid a circular import between the two) designed to be
    extractable into its own repo later if it's ever reused outside fx-pcn.
+   As of 2026-08-06, that layer is actually registered with `graph-nexus`
+   and linked in production (`/home/emily/output/graph-nexus`, outside this
+   repo) -- see README's "The currency -> region/institution vocabulary
+   layer" for status and `graph-nexus`'s own README/CHANGELOG for the full
+   registration/linking story, including a manual override needed for
+   `Bank of England`. If the export is regenerated and re-registered, the
+   command used was:
+   ```bash
+   graph-nexus register-source fx-pcn \
+     --repo-root /home/emily/output/graph-nexus \
+     --ttl-path <path to the latest export-rdf output> \
+     --concept-type skos:Concept \
+     --label-property skos:prefLabel \
+     --base-iri https://fx-pcn.local/kg/
+   graph-nexus link fx-pcn --repo-root /home/emily/output/graph-nexus
+   ```
 
 All of this is driven through a single CLI, `src/fx_pcn/cli.py` (entry point `fx-pcn`,
 also runnable as `python -m fx_pcn.cli`) with one subcommand per stage.

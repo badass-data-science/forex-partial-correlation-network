@@ -456,6 +456,18 @@ appear as concepts there, and — more importantly — `royal bank of canada`
 false-friend risk for a label-similarity linker if `Bank of Canada` were
 minted anyway.
 
+**Status (as of 2026-08-06):** this layer has been registered with
+`graph-nexus` and linked, in production, outside this repo — all 8 regions
+and all 4 institutions are genuinely connected into the hub's canonical
+concept scheme (`fx-pcn: 11 linked, 0 pending` via `graph-nexus status`).
+One institution, Bank of England, needed a manual override after LLM
+adjudication rejected it twice with a rationale that didn't hold up against
+its own decisions on Bank of Japan/Federal Reserve in the same run — see
+`graph-nexus`'s own README ("A worked example: fx-pcn") and CHANGELOG for
+the full story. Nothing in this repo changed to make that registration
+happen; it's still true that exporting the RDF and registering/linking it
+are two separate, independently-triggered steps.
+
 ## Interpreting the results
 
 The rest of this README is about how the numbers get computed. This section
