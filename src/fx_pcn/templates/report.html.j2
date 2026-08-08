@@ -42,10 +42,40 @@
   <figure>
     <img src="{{ network_graph_data_uri }}" alt="FX partial-correlation network graph for {{ report_date }}">
   </figure>
+
+  <h3>All edges — {{ report_date }}</h3>
+  {% if latest_edge_rows %}
+  <table>
+    <thead>
+      <tr>
+        <th>Pair i</th>
+        <th>Pair j</th>
+        <th>Partial corr</th>
+        <th>Direction</th>
+        <th>Granger p (i&rarr;j)</th>
+        <th>Granger p (j&rarr;i)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in latest_edge_rows %}
+      <tr>
+        <td>{{ row.pair_i }}</td>
+        <td>{{ row.pair_j }}</td>
+        <td>{{ '%+.4f' | format(row.partial_corr) }}</td>
+        <td>{{ row.direction | replace('_', ' ') }}</td>
+        <td>{{ '%.4f' | format(row.granger_p_i_to_j) }}</td>
+        <td>{{ '%.4f' | format(row.granger_p_j_to_i) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="no-data">No edges survived the lasso penalty on {{ report_date }}.</p>
+  {% endif %}
 </section>
 
 <section id="recent-data">
-  <h2>Most recent data</h2>
+  <h2>Most recent density data</h2>
   {% if recent_density_rows %}
   <table>
     <thead>
@@ -97,8 +127,8 @@
         <td>{{ row.date }}</td>
         <td>{{ row.pair_i }}</td>
         <td>{{ row.pair_j }}</td>
-        <td>{{ row.previous_direction }}</td>
-        <td>{{ row.new_direction }}</td>
+        <td>{{ row.previous_direction | replace('_', ' ') }}</td>
+        <td>{{ row.new_direction | replace('_', ' ') }}</td>
       </tr>
       {% endfor %}
     </tbody>

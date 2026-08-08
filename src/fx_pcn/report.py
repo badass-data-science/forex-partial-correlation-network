@@ -53,6 +53,15 @@ _DENSITY_TABLE_COLUMNS = [
 
 _FLIPS_TABLE_COLUMNS = ['date', 'pair_i', 'pair_j', 'previous_direction', 'new_direction']
 
+_EDGE_TABLE_COLUMNS = [
+    'pair_i',
+    'pair_j',
+    'partial_corr',
+    'direction',
+    'granger_p_i_to_j',
+    'granger_p_j_to_i',
+]
+
 _DEFAULT_MODEL = os.environ.get('LLM_MODEL', 'ollama_chat/glm-5.2:cloud')
 
 _TEMPLATES_DIR = Path(__file__).parent / 'templates'
@@ -111,6 +120,25 @@ def _network_graph_data_uri(edges: pd.DataFrame) -> str:
     png_bytes: bytes = dot.pipe(format='png')
     encoded = base64.b64encode(png_bytes).decode('ascii')
     return f'data:image/png;base64,{encoded}'
+
+
+def _latest_edge_rows(edges: pd.DataFrame) -> list[dict]:
+    """Every edge for the most recent date, in tabular form -- the same edges
+    the graph draws (render_graph._latest_edges keeps every skeleton edge
+    regardless of |partial_corr|; only the printed xlabel is gated by
+    render_graph.LABEL_THRESHOLD), sorted ascending by pair_i then pair_j."""
+    latest = render_graph._latest_edges(edges).sort_values(['pair_i', 'pair_j'])
+    return [
+        {
+            'pair_i': str(row['pair_i']),
+            'pair_j': str(row['pair_j']),
+            'partial_corr': float(row['partial_corr']),
+            'direction': str(row['direction']),
+            'granger_p_i_to_j': float(row['granger_p_i_to_j']),
+            'granger_p_j_to_i': float(row['granger_p_j_to_i']),
+        }
+        for _, row in latest[_EDGE_TABLE_COLUMNS].iterrows()
+    ]
 
 
 def _boxplot_data_uri(density: pd.DataFrame) -> str:
@@ -302,6 +330,7 @@ def generate_report(
         updated=datetime.datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S %Z'),
         params=params,
         network_graph_data_uri=_network_graph_data_uri(edges),
+        latest_edge_rows=_latest_edge_rows(edges),
         boxplot_data_uri=_boxplot_data_uri(density),
         timeseries_data_uri=_timeseries_data_uri(density),
         recent_density_rows=recent_density_rows,

@@ -1,9 +1,17 @@
 import datetime
 
 import pandas as pd
+import pytest
 
 from fx_pcn import density as density_mod
-from fx_pcn.report import _recent_density_rows, _recent_flip_rows, _run_params, generate_report
+from fx_pcn.render_graph import LABEL_THRESHOLD
+from fx_pcn.report import (
+    _latest_edge_rows,
+    _recent_density_rows,
+    _recent_flip_rows,
+    _run_params,
+    generate_report,
+)
 
 DAY1 = datetime.date(2026, 1, 1)
 DAY2 = datetime.date(2026, 1, 2)
@@ -91,6 +99,36 @@ def test_recent_flip_rows_handles_empty_table():
     assert _recent_flip_rows(pd.DataFrame(columns=['date', 'pair_i', 'pair_j'])) == []
 
 
+def test_latest_edge_rows_includes_edges_below_the_graph_label_threshold():
+    # A second, weak edge on the same (most recent) date whose |partial_corr|
+    # sits below render_graph.LABEL_THRESHOLD -- it gets no printed label on
+    # the graph image, but must still appear in the table.
+    weak_partial_corr = LABEL_THRESHOLD - 0.1
+    assert weak_partial_corr > 0  # sanity: still a real, non-trivial edge
+    edges = pd.DataFrame(
+        [
+            _edges_row(date=DAY1),
+            _edges_row(
+                date=DAY1,
+                pair_i='GBP/USD',
+                pair_j='USD/JPY',
+                partial_corr=weak_partial_corr,
+                direction='undirected',
+            ),
+        ]
+    )
+
+    rows = _latest_edge_rows(edges)
+
+    assert [(r['pair_i'], r['pair_j']) for r in rows] == [
+        ('EUR/USD', 'USD/CAD'),
+        ('GBP/USD', 'USD/JPY'),
+    ]
+    weak_row = rows[1]
+    assert weak_row['partial_corr'] == pytest.approx(weak_partial_corr)
+    assert weak_row['direction'] == 'undirected'
+
+
 def test_generate_report_writes_self_contained_html(tmp_path):
     edges = _synthetic_edges()
     density = density_mod.compute_density_table(edges)
@@ -107,5 +145,31 @@ def test_generate_report_writes_self_contained_html(tmp_path):
     for value in _RUN_PARAMS.values():
         assert str(value) in html
     assert 'EUR/USD' in html and 'USD/CAD' in html
+    assert 'All edges' in html
+    assert 'Most recent density data' in html
     assert html.count('data:image/png;base64,') == 3  # graph + boxplots + time series
     assert 'LLM summary skipped' in html
+
+
+def test_generate_report_replaces_underscores_with_spaces_in_direction_columns(tmp_path):
+    edges = _synthetic_edges()
+    density = density_mod.compute_density_table(edges)
+    flips = pd.DataFrame(
+        [
+            {
+                'date': DAY3,
+                'pair_i': 'EUR/USD',
+                'pair_j': 'USD/CAD',
+                'previous_direction': 'undirected',
+                'new_direction': 'no_edge',
+            }
+        ]
+    )
+    output_path = tmp_path / 'report.html'
+
+    generate_report(edges, density, flips, output_path, include_llm_summary=False)
+
+    html = output_path.read_text(encoding='utf-8')
+
+    assert 'no_edge' not in html
+    assert 'no edge' in html

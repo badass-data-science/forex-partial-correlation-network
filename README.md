@@ -558,8 +558,8 @@ The report contains, in order:
 | Section | Content |
 |---|---|
 | Front matter | The date the report is relevant to (the source data's most recent date) and the `(window_days, step_days, min_observations, max_lag, fdr_alpha, granularity)` regime that produced it |
-| Network graph | The most recent date's graph — the same rendering `render-graph` produces, piped straight to an embedded PNG rather than a temp file |
-| Most recent data | The last 5 `compute-density` rows, sorted ascending by date: date, edge count, density, mean \|partial corr\|, directed/bidirected/undirected counts |
+| Network graph | The most recent date's graph — the same rendering `render-graph` produces, piped straight to an embedded PNG rather than a temp file — plus an "All edges" table underneath with every edge for that date (pair_i, pair_j, partial corr, direction, both Granger p-values), including ones below the graph's own label threshold |
+| Most recent density data | The last 5 `compute-density` rows, sorted ascending by date: date, edge count, density, mean \|partial corr\|, directed/bidirected/undirected counts |
 | Most recent direction changes | The last 10 `find-direction-flips` rows, sorted ascending by date then pair_i/pair_j: date, pair_i, pair_j, previous/new direction |
 | Distributions | Boxplots of density and mean \|partial corr\| across the full history (date range in the plot title), each marked with that metric's most recent value |
 | Trends | Time series of density and mean \|partial corr\| over the trailing year, each marked with that metric's most recent value |
