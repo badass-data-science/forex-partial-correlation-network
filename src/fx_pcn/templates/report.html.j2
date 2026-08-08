@@ -43,6 +43,125 @@
     <img src="{{ network_graph_data_uri }}" alt="FX partial-correlation network graph for {{ report_date }}">
   </figure>
 
+  <h3>D3 force-directed version (experimental) — {{ report_date }}</h3>
+  <p class="meta">Same edges as the graph above, laid out with a D3 force simulation instead
+    of Graphviz — for visual comparison. Drag a node to rearrange it.</p>
+  <div id="d3-graph"></div>
+  <script>{{ d3_js | safe }}</script>
+  <script>
+  (function () {
+    var graph = {{ d3_graph_data | safe }};
+    var width = 760, height = 620, nodeRadius = 34;
+    var posColor = [42, 120, 214], negColor = [227, 73, 72], midColor = [185, 184, 178];
+    var saturationCeiling = 0.6;
+
+    function mixColor(pcorr) {
+      var t = Math.min(Math.abs(pcorr) / saturationCeiling, 1);
+      var pole = pcorr >= 0 ? posColor : negColor;
+      var rgb = midColor.map(function (m, i) { return Math.round(m + (pole[i] - m) * t); });
+      return 'rgb(' + rgb.join(',') + ')';
+    }
+    function edgeWidth(pcorr) {
+      return 1.4 + Math.min(Math.abs(pcorr) / saturationCeiling, 1) * 4.6;
+    }
+    function pointNear(from, to, r) {
+      var dx = to.x - from.x, dy = to.y - from.y;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      return { x: to.x - (dx / len) * r, y: to.y - (dy / len) * r };
+    }
+
+    var svg = d3.select('#d3-graph').append('svg')
+        .attr('viewBox', '0 0 ' + width + ' ' + height)
+        .attr('width', '100%')
+        .attr('height', height)
+        .style('background', '#fcfcfb')
+        .style('border', '1px solid #e8e8e8')
+        .style('border-radius', '4px');
+
+    var defs = svg.append('defs');
+    graph.links.forEach(function (d, i) {
+      defs.append('marker')
+          .attr('id', 'd3-arrow-' + i)
+          .attr('viewBox', '0 -5 10 10')
+          .attr('refX', 9)
+          .attr('markerWidth', 6)
+          .attr('markerHeight', 6)
+          .attr('orient', 'auto-start-reverse')
+        .append('path')
+          .attr('d', 'M0,-5L10,0L0,5')
+          .attr('fill', mixColor(d.partial_corr));
+    });
+
+    var simulation = d3.forceSimulation(graph.nodes)
+        .force('link', d3.forceLink(graph.links).id(function (d) { return d.id; })
+          .distance(150).strength(0.6))
+        .force('charge', d3.forceManyBody().strength(-420))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collide', d3.forceCollide(nodeRadius + 6));
+
+    var link = svg.append('g').selectAll('line')
+        .data(graph.links)
+        .join('line')
+          .attr('stroke', function (d) { return mixColor(d.partial_corr); })
+          .attr('stroke-width', function (d) { return edgeWidth(d.partial_corr); })
+          .attr('marker-end', function (d, i) {
+            return (d.arrow === 'forward' || d.arrow === 'both') ? 'url(#d3-arrow-' + i + ')' : null;
+          })
+          .attr('marker-start', function (d, i) {
+            return d.arrow === 'both' ? 'url(#d3-arrow-' + i + ')' : null;
+          });
+
+    var linkLabel = svg.append('g').selectAll('text')
+        .data(graph.links.filter(function (d) { return d.label; }))
+        .join('text')
+          .attr('font-size', 10)
+          .attr('font-family', 'Helvetica, Arial, sans-serif')
+          .attr('fill', '#0b0b0b')
+          .attr('text-anchor', 'middle')
+          .text(function (d) { return (d.partial_corr >= 0 ? '+' : '') + d.partial_corr.toFixed(2); });
+
+    var node = svg.append('g').selectAll('g')
+        .data(graph.nodes)
+        .join('g')
+          .call(d3.drag()
+            .on('start', function (event, d) {
+              if (!event.active) simulation.alphaTarget(0.3).restart();
+              d.fx = d.x; d.fy = d.y;
+            })
+            .on('drag', function (event, d) { d.fx = event.x; d.fy = event.y; })
+            .on('end', function (event, d) {
+              if (!event.active) simulation.alphaTarget(0);
+              d.fx = null; d.fy = null;
+            }));
+
+    node.append('circle')
+        .attr('r', nodeRadius)
+        .attr('fill', '#fcfcfb')
+        .attr('stroke', '#0b0b0b')
+        .attr('stroke-width', 1.2);
+
+    node.append('text')
+        .text(function (d) { return d.id; })
+        .attr('text-anchor', 'middle')
+        .attr('dy', '0.32em')
+        .attr('font-size', 11)
+        .attr('font-family', 'Helvetica, Arial, sans-serif')
+        .attr('fill', '#0b0b0b');
+
+    simulation.on('tick', function () {
+      link.each(function (d) {
+        var start = pointNear(d.target, d.source, nodeRadius);
+        var end = pointNear(d.source, d.target, nodeRadius);
+        d3.select(this).attr('x1', start.x).attr('y1', start.y).attr('x2', end.x).attr('y2', end.y);
+      });
+      linkLabel
+          .attr('x', function (d) { return (d.source.x + d.target.x) / 2; })
+          .attr('y', function (d) { return (d.source.y + d.target.y) / 2; });
+      node.attr('transform', function (d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+    });
+  })();
+  </script>
+
   <h3>All edges — {{ report_date }}</h3>
   {% if latest_edge_rows %}
   <table>

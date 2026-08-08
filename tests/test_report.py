@@ -1,4 +1,5 @@
 import datetime
+import json
 
 import pandas as pd
 import pytest
@@ -6,6 +7,7 @@ import pytest
 from fx_pcn import density as density_mod
 from fx_pcn.render_graph import LABEL_THRESHOLD
 from fx_pcn.report import (
+    _d3_graph_data,
     _latest_edge_rows,
     _recent_density_rows,
     _recent_flip_rows,
@@ -129,6 +131,30 @@ def test_latest_edge_rows_includes_edges_below_the_graph_label_threshold():
     assert weak_row['direction'] == 'undirected'
 
 
+def test_d3_graph_data_mirrors_render_graphs_arrow_logic():
+    edges = pd.DataFrame(
+        [
+            _edges_row(date=DAY1, direction='undirected'),
+            _edges_row(
+                date=DAY1,
+                pair_i='GBP/USD',
+                pair_j='USD/JPY',
+                direction='USD/JPY->GBP/USD',
+                partial_corr=0.5,
+            ),
+        ]
+    )
+
+    data = json.loads(_d3_graph_data(edges))
+
+    assert {n['id'] for n in data['nodes']} == {'EUR/USD', 'USD/CAD', 'GBP/USD', 'USD/JPY'}
+    links_by_pair = {(link['source'], link['target']): link for link in data['links']}
+    assert links_by_pair[('EUR/USD', 'USD/CAD')]['arrow'] == 'none'  # undirected
+    forward = links_by_pair[('USD/JPY', 'GBP/USD')]  # direction split on '->' gives source/target
+    assert forward['arrow'] == 'forward'
+    assert forward['label'] is True  # |0.5| >= LABEL_THRESHOLD
+
+
 def test_generate_report_writes_self_contained_html(tmp_path):
     edges = _synthetic_edges()
     density = density_mod.compute_density_table(edges)
@@ -148,6 +174,8 @@ def test_generate_report_writes_self_contained_html(tmp_path):
     assert 'All edges' in html
     assert 'Most recent density data' in html
     assert html.count('data:image/png;base64,') == 3  # graph + boxplots + time series
+    assert 'id="d3-graph"' in html
+    assert 'd3js.org' in html  # vendored D3 bundle is inlined, not CDN-linked
     assert 'LLM summary skipped' in html
 
 
