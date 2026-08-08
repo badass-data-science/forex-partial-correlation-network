@@ -69,22 +69,22 @@ def test_run_params_reads_most_recent_dates_regime_settings():
     assert _run_params(edges) == _RUN_PARAMS
 
 
-def test_recent_density_rows_sorts_most_recent_first():
+def test_recent_density_rows_sorts_ascending_by_date():
     edges = _synthetic_edges()
     density = density_mod.compute_density_table(edges)
 
     rows = _recent_density_rows(density, n=2)
 
-    assert [r['date'] for r in rows] == [DAY3, DAY2]
-    assert rows[0]['edge_count'] == 1
-    assert rows[0]['bidirected_edge_count'] == 1
+    assert [r['date'] for r in rows] == [DAY2, DAY3]
+    assert rows[-1]['edge_count'] == 1
+    assert rows[-1]['bidirected_edge_count'] == 1
 
 
-def test_recent_flip_rows_sorts_most_recent_first():
+def test_recent_flip_rows_sorts_ascending_by_date_then_pair():
     rows = _recent_flip_rows(_synthetic_flips(), n=10)
 
-    assert [r['date'] for r in rows] == [DAY3, DAY2]
-    assert rows[0]['new_direction'] == 'EUR/USD<->USD/CAD'
+    assert [r['date'] for r in rows] == [DAY2, DAY3]
+    assert rows[-1]['new_direction'] == 'EUR/USD<->USD/CAD'
 
 
 def test_recent_flip_rows_handles_empty_table():

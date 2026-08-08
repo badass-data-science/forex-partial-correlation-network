@@ -26,6 +26,9 @@ _ACCENT_COLOR = render_graph.POS_COLOR
 _INK_COLOR = render_graph.INK_COLOR
 _SURFACE_COLOR = render_graph.SURFACE_COLOR
 _MUTED_COLOR = render_graph.MUTED_COLOR
+_MARKER_COLOR = render_graph.NEG_COLOR  # already the palette's "red", reused for visibility
+
+_LATEST_VALUE_LABEL = 'Most recent value'
 
 _TRAILING_YEAR = datetime.timedelta(days=365)
 
@@ -79,6 +82,27 @@ def _style_axes(ax: plt.Axes, title: str) -> None:
     ax.set_axisbelow(True)
 
 
+def _mark_latest_value(ax: plt.Axes, x: int | datetime.date, y: float) -> None:
+    """A highly visible marker for the metric's most recent value, with a
+    legend entry naming it -- distinguishes "the current reading" from the
+    rest of the distribution/trend at a glance."""
+    # matplotlib's stubs don't model datetime.date x-values, though plotting dates on the
+    # x-axis (as _timeseries_data_uri already does via ax.plot) is supported at runtime.
+    ax.scatter(
+        [x],  # type: ignore[arg-type]
+        [y],
+        color=_MARKER_COLOR,
+        edgecolor=_INK_COLOR,
+        linewidth=0.8,
+        s=70,
+        zorder=5,
+        label=_LATEST_VALUE_LABEL,
+    )
+    legend = ax.legend(loc='upper right', fontsize=7.5, frameon=False)
+    for text in legend.get_texts():
+        text.set_color(_INK_COLOR)
+
+
 def _network_graph_data_uri(edges: pd.DataFrame) -> str:
     """Reuses render_graph's existing Graphviz construction, piping straight to
     in-memory PNG bytes (no temp file) rather than duplicating its layout logic."""
@@ -90,8 +114,12 @@ def _network_graph_data_uri(edges: pd.DataFrame) -> str:
 
 
 def _boxplot_data_uri(density: pd.DataFrame) -> str:
-    """Distribution of density and mean |partial corr| across the full history."""
-    fig, axes = plt.subplots(1, 2, figsize=(8, 4), facecolor=_SURFACE_COLOR)
+    """Distribution of density and mean |partial corr| across the full history,
+    each with a marker for that metric's most recent value."""
+    date_min, date_max = density['date'].min(), density['date'].max()
+    latest = density.sort_values('date').iloc[-1]
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4.5), facecolor=_SURFACE_COLOR)
     columns = [('density', 'Density'), ('mean_abs_partial_corr', 'Mean |partial corr|')]
     for ax, (column, title) in zip(axes, columns, strict=True):
         ax.boxplot(
@@ -104,29 +132,34 @@ def _boxplot_data_uri(density: pd.DataFrame) -> str:
             flierprops={'markeredgecolor': _MUTED_COLOR, 'markersize': 3},
         )
         ax.set_xticks([])
-        _style_axes(ax, title)
+        _style_axes(ax, f'{title}\n{date_min} to {date_max}')
+        _mark_latest_value(ax, 1, latest[column])
     fig.tight_layout()
     return _fig_to_data_uri(fig)
 
 
 def _timeseries_data_uri(density: pd.DataFrame) -> str:
     """Density and mean |partial corr| over the trailing year from the source
-    data's most recent date."""
+    data's most recent date, each with a marker for that metric's most recent
+    value."""
     cutoff = density['date'].max() - _TRAILING_YEAR
     recent = density[density['date'] >= cutoff].sort_values('date')
+    latest = recent.iloc[-1]
 
     fig, axes = plt.subplots(1, 2, figsize=(9, 4), facecolor=_SURFACE_COLOR)
     columns = [('density', 'Density'), ('mean_abs_partial_corr', 'Mean |partial corr|')]
     for ax, (column, title) in zip(axes, columns, strict=True):
         ax.plot(recent['date'], recent[column], color=_ACCENT_COLOR, linewidth=1.4)
         _style_axes(ax, title)
+        _mark_latest_value(ax, latest['date'], latest[column])
     fig.autofmt_xdate(rotation=30)
     fig.tight_layout()
     return _fig_to_data_uri(fig)
 
 
 def _recent_density_rows(density: pd.DataFrame, n: int = 5) -> list[dict]:
-    recent = density.sort_values('date', ascending=False).head(n)
+    """The n most recent dates, ascending (oldest of the n first)."""
+    recent = density.sort_values('date', ascending=True).tail(n)
     return [
         {
             'date': row['date'],
@@ -142,11 +175,11 @@ def _recent_density_rows(density: pd.DataFrame, n: int = 5) -> list[dict]:
 
 
 def _recent_flip_rows(flips: pd.DataFrame, n: int = 10) -> list[dict]:
+    """The n most recent flips, ascending by date then pair_i/pair_j (oldest
+    of the n first)."""
     if flips.empty:
         return []
-    recent = flips.sort_values(
-        ['date', 'pair_i', 'pair_j'], ascending=[False, True, True]
-    ).head(n)
+    recent = flips.sort_values(['date', 'pair_i', 'pair_j'], ascending=True).tail(n)
     return [
         {
             'date': row['date'],
