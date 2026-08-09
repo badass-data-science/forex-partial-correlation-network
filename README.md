@@ -335,7 +335,7 @@ changes needed. The event-conditioned regime would need genuinely new logic
 
 `src/fx_pcn/flows.py` runs the full artifact chain (`run-pipeline
 --append` → `compute-density --append` → `find-direction-flips --append` →
-`render-graph` → `export-rdf`) for four of the five regimes above — every
+`render-graph` → `export-rdf` → `generate-report`) for four of the five regimes above — every
 regime except event-conditioned, which still needs the calendar-alignment
 logic noted above — every weekday at 6:30pm Eastern. Each regime is an
 independent Prefect deployment of the same flow, not one flow looping over

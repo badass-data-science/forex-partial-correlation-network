@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `fx_pcn.flows`: `regime_pipeline_flow` now also runs `generate-report` as
+  the last step of the artifact chain (after `export-rdf`), writing
+  `report---window-days-N---...---granularity-X.html` alongside the other
+  regime artifacts via the existing `regime_output_path()` naming
+  convention. Gets its own `retries=3` policy like `_run_pipeline_task`,
+  since it also makes a network call (the LLM summary), not because it
+  touches InfluxDB.
 - `graphify-out/graph.html`, `graphify-out/GRAPH_REPORT.md`, and
   `graphify-out/graph.json`: a `graphify`-generated knowledge graph of this
   repo itself (entities/relationships from both AST-parsed code and
