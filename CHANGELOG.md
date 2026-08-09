@@ -7,6 +7,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `generate-summary`/`export-summary-rdf`: the LLM qualitative summary's
+  strategic takeaways are now also available as RDF (`fx_pcn.summary`, new
+  `fxpcn:QualitativeSummaryRun`/`fxpcn:takeawayBullet`/`fxpcn:llmModel`
+  terms). The prompt now closes with a fixed `STRATEGIC TAKEAWAYS:` heading
+  followed by bullet lines, parsed out of the response and rendered both as
+  an HTML bullet list (`report.html.j2`'s "Strategic takeaways") and as
+  one-bullet-per-triple `fxpcn:takeawayBullet` literals. Kept as a second,
+  independent `.ttl` file rather than folded into `export-rdf`'s output --
+  the numeric graph must stay exportable even when the LLM/Ollama is down,
+  so it can't depend on this step succeeding. The two files stay joinable
+  once both are loaded into the same Neo4j graph because both compute the
+  identical `prov:Activity` URI for a given regime
+  (`fxpcn:QualitativeSummaryRun` links to it via `prov:wasInformedBy`, not
+  `wasGeneratedBy` -- correct PROV-O usage for "used output from," and a way
+  to filter LLM opinion out of hard numeric fact by `rdf:type` alone).
+  `generate-report --bullets-output`/`--append-bullets` write/accumulate the
+  underlying bullets parquet (one row per bullet per report date,
+  accumulated the same way `compute-density`/`find-direction-flips` tables
+  are, not overwritten each run) from the same LLM call the HTML narrative
+  already makes -- not a second, potentially inconsistent one. `fx_pcn.flows`:
+  `_generate_report_task` now also writes this sidecar, and a new
+  `_export_summary_rdf_task` runs after it, independent of the existing
+  `_export_rdf_task`.
+
+### Fixed
+- `export-rdf`: `EdgeObservation`/`NetworkSnapshot`/`DirectionFlip` URIs were
+  keyed only by `(date, pair_i, pair_j)` or `(date)`, with the parameter
+  regime reachable only via `prov:wasGeneratedBy` on a separate
+  `prov:Activity` node. Different regimes' `.ttl` exports get loaded into
+  the same Neo4j graph via n10s (see the ops runbook's
+  `load-ttl-files-into-Neo4j.cypher`), which enforces a unique-URI
+  constraint -- two regimes observing the same date/pair would collide and
+  silently overwrite each other's properties. Fixed by folding a regime
+  slug into all three URI schemes; `build_graph()` now raises `ValueError`
+  if `density`/`flips` are passed alongside an `edges` table spanning more
+  than one regime, since those tables carry no regime column of their own
+  to attribute against.
+
+### Added
 - `fx_pcn.flows`: `regime_pipeline_flow` now also runs `generate-report` as
   the last step of the artifact chain (after `export-rdf`), writing
   `report---window-days-N---...---granularity-X.html` alongside the other

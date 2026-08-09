@@ -20,10 +20,19 @@ rolling window of H1 bars it:
 6. Optionally renders the most recent date's graph as a PNG via Graphviz (`render_graph.py`).
 7. Optionally exports the edge table (plus density/direction-flips) as RDF/Turtle
    (`rdf_export.py`) -- output only, nothing here loads it into a triple store.
-   Includes a static currency -> region/institution vocabulary layer
+   `EdgeObservation`/`NetworkSnapshot`/`DirectionFlip` URIs fold in a regime
+   slug (not just reachable via `prov:wasGeneratedBy`), since multiple
+   regimes' `.ttl` files get loaded into the same Neo4j graph via n10s and
+   would otherwise collide on its unique-URI constraint. Includes a static
+   currency -> region/institution vocabulary layer
    (`macro_vocabulary.py`; shared RDF namespace constants in `ontology.py`,
    split out to avoid a circular import between the two) designed to be
    extractable into its own repo later if it's ever reused outside fx-pcn.
+   The LLM qualitative summary's takeaway bullets (see step 8's `generate-report`
+   note) get their own, independent RDF export too (`export-summary-rdf`,
+   `fxpcn:QualitativeSummaryRun` linked to the regime's `prov:Activity` via
+   `prov:wasInformedBy`) -- kept separate from the numeric export so an
+   LLM/Ollama outage never blocks it.
    As of 2026-08-06, that layer is actually registered with `graph-nexus`
    and linked in production (`/home/emily/output/graph-nexus`, outside this
    repo) -- see README's "The currency -> region/institution vocabulary
@@ -40,8 +49,10 @@ rolling window of H1 bars it:
      --base-iri https://fx-pcn.local/kg/
    graph-nexus link fx-pcn --repo-root /home/emily/output/graph-nexus
    ```
-8. Optionally runs all of the above (steps 1-6, plus RDF export and HTML
-   report generation for regimes that need it) automatically every weekday
+8. Optionally runs all of the above (steps 1-6, plus RDF export, HTML
+   report generation (which also writes the summary-bullets sidecar via
+   `--bullets-output`/`--append-bullets`), and the summary RDF export, for
+   regimes that need it) automatically every weekday
    at 6:30pm Eastern, for four of the five parameter regimes in README's
    "Other parameter regimes" table
    (`flows.py`, Prefect -- see README's "Automated daily runs (Prefect)"
