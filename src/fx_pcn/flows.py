@@ -41,6 +41,7 @@ class RegimeParams(TypedDict):
     max_lag: int
     min_observations: int
     fdr_alpha: float
+    network_name: str
 
 
 # The README's "Other parameter regimes" table gives ranges, not exact
@@ -66,6 +67,7 @@ REGIME_PARAMS: dict[str, RegimeParams] = {
         'max_lag': config.MAX_LAG,
         'min_observations': config.MIN_OBSERVATIONS_PER_WINDOW,
         'fdr_alpha': config.FDR_ALPHA,
+        'network_name': config.DEFAULT_NETWORK_NAME,
     },
     'intraday': {
         'granularity': 'M15',
@@ -74,6 +76,7 @@ REGIME_PARAMS: dict[str, RegimeParams] = {
         'max_lag': 12,
         'min_observations': 96,
         'fdr_alpha': 0.05,
+        'network_name': config.DEFAULT_NETWORK_NAME,
     },
     'macro': {
         'granularity': 'D',
@@ -82,6 +85,7 @@ REGIME_PARAMS: dict[str, RegimeParams] = {
         'max_lag': 3,
         'min_observations': 30,
         'fdr_alpha': 0.05,
+        'network_name': config.DEFAULT_NETWORK_NAME,
     },
     'policy': {
         'granularity': 'D',
@@ -90,6 +94,7 @@ REGIME_PARAMS: dict[str, RegimeParams] = {
         'max_lag': 7,
         'min_observations': 90,
         'fdr_alpha': 0.05,
+        'network_name': config.DEFAULT_NETWORK_NAME,
     },
 }
 
@@ -98,6 +103,7 @@ def regime_output_path(
     output_dir: Path,
     artifact: str,
     *,
+    network_name: str,
     window_days: int,
     step_days: int,
     min_observations: int,
@@ -106,14 +112,22 @@ def regime_output_path(
     granularity: str,
     ext: str,
 ) -> Path:
-    """The `<artifact>---window-days-N---step-days-N---min-observations-N---
-    max-lag-N---fdr-alpha-N---granularity-X.<ext>` naming convention already
-    in use for every file in `~/output/forex-partial-correlation-network` --
-    keeps every artifact traceable to the exact regime that produced it
-    without needing to open the file.
+    """The `<artifact>---network-name-X---window-days-N---step-days-N---
+    min-observations-N---max-lag-N---fdr-alpha-N---granularity-X.<ext>`
+    naming convention already in use for every file in
+    `~/output/forex-partial-correlation-network` -- keeps every artifact
+    traceable to the exact network and regime that produced it without
+    needing to open the file.
+
+    `network_name` is folded in (not just `window_days`/etc.) for the same
+    reason `rdf_export.py`'s regime slug folds it in too: every regime in
+    `REGIME_PARAMS` currently uses the same default network, but two
+    differently-scoped networks sharing an otherwise identical regime would
+    otherwise collide on this filename and silently overwrite each other.
     """
     name = (
         f'{artifact}'
+        f'---network-name-{network_name}'
         f'---window-days-{window_days}'
         f'---step-days-{step_days}'
         f'---min-observations-{min_observations}'
@@ -140,6 +154,7 @@ def _run_pipeline_task(output_path: Path, params: RegimeParams) -> None:
         max_lag=params['max_lag'],
         fdr_alpha=params['fdr_alpha'],
         granularity=params['granularity'],
+        network_name=params['network_name'],
         append=True,
     )
     logger.info(

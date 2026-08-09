@@ -53,6 +53,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     `fx_pcn.summary`'s LLM prompt likewise names the network and its pairs
     instead of assuming "the 7 major currency pairs".
 
+### Added
+- `fx_pcn.flows`: `regime_output_path()`'s filenames now fold in
+  `network_name` (`<artifact>---network-name-X---window-days-N---...`, `X`
+  first, mirroring `rdf_export.py`'s regime-slug ordering) -- previously
+  keyed only by `window_days`/`step_days`/etc., so a future scheduled
+  regime built from a different `--pairs` network under an otherwise
+  identical regime would have silently collided with (and overwritten) an
+  existing regime's files on disk. `RegimeParams`/`REGIME_PARAMS` gained a
+  `network_name` field (all four current regimes: the default
+  `forex-network-seven-majors`), and `_run_pipeline_task` now actually
+  passes it to `pipeline.run` -- previously relied on `pipeline.run`'s own
+  default happening to match, which would have silently diverged the
+  moment a regime's `network_name` differed from the default.
+
 ### Fixed
 - `run-pipeline --append`: the network-name mismatch guard above crashed
   with `KeyError('network_name')` against any edge-table parquet written
