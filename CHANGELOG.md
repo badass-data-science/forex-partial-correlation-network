@@ -7,6 +7,53 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `run-pipeline --pairs`/`--network-name`: build the network from any set of
+  currency pairs, not just the default 7 majors (`config.DEFAULT_NETWORK_NAME`,
+  `'forex-network-seven-majors'`). `--network-name` is **required** whenever
+  `--pairs` is given (enforced in `cli.main`, before InfluxDB is ever hit) --
+  a custom pair set is never allowed to pass through unnamed, so it can't get
+  silently conflated with another network downstream. `--network-name` alone
+  (without `--pairs`) is also allowed, to rename the default network without
+  changing its pair set.
+  - `network_name` and `pairs` (the ordered pair list, comma-joined) are now
+    columns on every edge-table row, stamped by `network.build_edge_table`
+    the same way `window_days`/`granularity`/etc. already are.
+    `network.pairs_from_edges` recovers the ordered list back out for
+    consumers that need the network's *full* pair universe, not just
+    whichever pairs happen to appear in `pair_i`/`pair_j` on a given date --
+    `density.compute_density_table`'s max-possible-edges denominator (no
+    longer a fixed `C(7,2)=21` constant) and `direction_flips.run`'s
+    complete `no_edge` grid both need this, since a pair the lasso penalty
+    zeroes out on *every* date never otherwise appears in either column.
+    Only `run-pipeline` itself takes `--pairs`/`--network-name`; every other
+    command (`compute-density`, `find-direction-flips`, `generate-report`,
+    `export-rdf`) reads a network's identity back out of the edge table
+    it's given.
+  - `pipeline.run --append` now refuses to append rows for one
+    `--network-name` into an `--output` file already holding a different
+    one, rather than silently mixing two networks' rows into a table every
+    downstream consumer assumes describes exactly one.
+  - `export-rdf`: new `fxpcn:Network` node per distinct `network_name`
+    (`kg:network/<slugified-name>`, `fxpcn:label`, one `fxpcn:hasPair` per
+    pair in that network -- including a pair with zero surviving edges,
+    read from the edge table's `pairs` column rather than inferred from
+    `pair_i`/`pair_j`), linked from its `prov:Activity` via `fxpcn:network`/
+    `fxpcn:networkName`. `network_name` joined the tuple `prov:Activity` and
+    every `EdgeObservation`/`NetworkSnapshot`/`DirectionFlip`/
+    `QualitativeSummaryRun` URI's regime slug is keyed by (alongside
+    `window_days`/`step_days`/etc.), for the same n10s unique-URI-collision
+    reason the regime slug already existed -- two differently-scoped
+    networks under an otherwise identical regime need to stay
+    distinguishable once loaded into the same Neo4j graph, same as two
+    regimes already did.
+  - `generate-report`: the HTML report now shows the network's name and
+    pair list in the front matter and title, and the "About this report"
+    explainer's pair count/"all possible pairings" math is now derived from
+    the network's own pairs rather than hardcoded to "7 majors"/"21 total".
+    `fx_pcn.summary`'s LLM prompt likewise names the network and its pairs
+    instead of assuming "the 7 major currency pairs".
+
+### Added
 - `generate-summary`/`export-summary-rdf`: the LLM qualitative summary's
   strategic takeaways are now also available as RDF (`fx_pcn.summary`, new
   `fxpcn:QualitativeSummaryRun`/`fxpcn:takeawayBullet`/`fxpcn:llmModel`

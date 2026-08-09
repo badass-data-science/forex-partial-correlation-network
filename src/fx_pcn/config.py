@@ -10,6 +10,12 @@ PAIRS: list[str] = [
     'NZD/USD',
 ]
 
+# The name recorded on every edge-table row (and folded into RDF URIs) when
+# no --network-name is given -- identifies which pair set ('PAIRS' above)
+# produced a given network, so custom pair sets (via --pairs/--network-name)
+# never get silently conflated with the default one.
+DEFAULT_NETWORK_NAME = 'forex-network-seven-majors'
+
 MEASUREMENT = 'forward-filled candlestick'
 GRANULARITY = 'H1'
 

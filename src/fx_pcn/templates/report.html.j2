@@ -1,7 +1,7 @@
 {% extends "base.html.j2" %}
 
 {% block head %}
-<title>Forex Partial-Correlation Network Report — {{ report_date }}</title>
+<title>Forex Partial-Correlation Network Report — {{ params.network_name }} — {{ report_date }}</title>
 <style>
   .front-matter {
     background: #f0f4ff;
@@ -33,12 +33,14 @@
 
 {% block body %}
 <h1>Forex Partial-Correlation Network Report</h1>
+<p class="meta">Network: <strong>{{ params.network_name }}</strong> ({{ pairs | join(', ') }})</p>
 <p class="meta">Generated: {{ updated }}</p>
 
 <div class="front-matter">
   <h2>Report date: {{ report_date }}</h2>
   <p class="meta">Data reflects the most recent date present in the source tables.</p>
   <ul class="params">
+    <li><span class="label">Network:</span>{{ params.network_name }}</li>
     <li><span class="label">Window days:</span>{{ params.window_days }}</li>
     <li><span class="label">Step days:</span>{{ params.step_days }}</li>
     <li><span class="label">Min observations:</span>{{ params.min_observations }}</li>
@@ -63,15 +65,16 @@
 
 <div class="about" id="about">
   <h2>About this report</h2>
-  <p>This report tracks a statistical network built from the returns of the 7 major FX
-    pairs. For each date, every pair of currencies is checked for a direct relationship
+  <p>This report tracks a statistical network built from the returns of {{ pairs | length }}
+    FX pairs ({{ pairs | join(', ') }}) — the <strong>{{ params.network_name }}</strong>
+    network. For each date, every pair of currencies is checked for a direct relationship
     with every other pair — the result is a graph where nodes are currency pairs and
     edges are the relationships that date's data actually supports. The measurements
     below are what the rest of this report is built from:</p>
   <dl>
     <dt>Partial correlation</dt>
     <dd><p>How strongly two pairs move together <em>after</em> netting out the influence of
-      the other five — it isolates a direct relationship from one that only shows up
+      the other {{ pairs | length - 1 }} — it isolates a direct relationship from one that only shows up
       because both pairs are being pushed around by some third pair they share.</p>
       <p><strong>Reading it:</strong> the sign tells you the direction of co-movement — positive
       means the two pairs tend to move the same way, negative means opposite. The magnitude
@@ -95,10 +98,11 @@
       than trusting one date in isolation.</p></dd>
 
     <dt>Density</dt>
-    <dd><p>The fraction of all possible pairings among the 7 majors (21 total) that have an
+    <dd><p>The fraction of all possible pairings among these {{ pairs | length }} pairs
+      ({{ (pairs | length) * (pairs | length - 1) // 2 }} total) that have an
       active edge on a given date — a rough gauge of how broadly interconnected the
       market is that day.</p>
-      <p><strong>Reading it:</strong> rising density usually means the majors are becoming more
+      <p><strong>Reading it:</strong> rising density usually means the pairs are becoming more
       interconnected — often a sign of market stress or a single dominant macro theme (a
       broad risk-on/risk-off move, a shared dollar driver) crowding out pair-specific
       behavior. Falling density usually means pairs are behaving more independently — a
@@ -112,7 +116,7 @@
       <p><strong>Reading it:</strong> a day with many <em>weak</em> edges (high density, low
       mean |partial corr|) is a different regime from a day with a few <em>very strong</em>
       ones (low density, high mean |partial corr|) — the first looks like broad, mild
-      co-movement across the majors; the second looks like a small cluster of pairs reacting
+      co-movement across the network; the second looks like a small cluster of pairs reacting
       intensely to the same thing. Read this measurement alongside density, not by itself.</p></dd>
 
     <dt>Direction</dt>

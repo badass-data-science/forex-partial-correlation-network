@@ -2,7 +2,7 @@ import datetime
 
 import pandas as pd
 
-from fx_pcn.direction_flips import find_direction_flips
+from fx_pcn.direction_flips import find_direction_flips, run
 
 DAY1 = datetime.date(2026, 1, 1)
 DAY2 = datetime.date(2026, 1, 2)
@@ -72,3 +72,29 @@ def test_find_direction_flips_first_date_never_flips():
     flips = find_direction_flips(edges, pairs=['A', 'B', 'C'])
 
     assert flips.empty
+
+
+def test_run_derives_pairs_from_the_edges_tables_own_pairs_column(tmp_path):
+    # (B, C) never has a surviving edge on either date -- run() must still
+    # know it's part of the network (via the 'pairs' column) to flag it
+    # going no_edge -> D3 on DAY2, rather than only recovering pairs that
+    # happened to appear in pair_i/pair_j.
+    edges = pd.DataFrame(
+        {
+            'date': [DAY1, DAY2],
+            'pair_i': ['A', 'B'],
+            'pair_j': ['B', 'C'],
+            'direction': ['A->B', 'B<->C'],
+            'pairs': ['A,B,C', 'A,B,C'],
+        }
+    )
+    input_path = tmp_path / 'edges.parquet'
+    output_path = tmp_path / 'flips.parquet'
+    edges.to_parquet(input_path)
+
+    flips = run(input_path, output_path)
+
+    assert {(row['pair_i'], row['pair_j']) for _, row in flips.iterrows()} == {
+        ('A', 'B'),
+        ('B', 'C'),
+    }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -16,6 +17,7 @@ _RUN_PARAM_COLUMNS = [
     'max_lag',
     'fdr_alpha',
     'granularity',
+    'network_name',
 ]
 
 
@@ -23,10 +25,22 @@ def _pair_uri(pair: str) -> URIRef:
     return KG[f'pair/{pair.replace("/", "")}']
 
 
+def _slugify(value: str) -> str:
+    """URI-safe form of an operator-chosen `network_name` -- collapses
+    anything that isn't alphanumeric to a single `-`, so a name with spaces
+    or slashes still produces a well-formed URI path segment."""
+    return re.sub(r'[^A-Za-z0-9]+', '-', value).strip('-')
+
+
+def _network_uri(network_name: str) -> URIRef:
+    return KG[f'network/{_slugify(network_name)}']
+
+
 def _regime_slug(params: tuple) -> str:
-    window_days, step_days, min_observations, max_lag, fdr_alpha, granularity = params
+    window_days, step_days, min_observations, max_lag, fdr_alpha, granularity, network_name = params
     return (
-        f'w{window_days}-s{step_days}-mo{min_observations}-ml{max_lag}-fdr{fdr_alpha}-{granularity}'
+        f'{_slugify(network_name)}-w{window_days}-s{step_days}-mo{min_observations}'
+        f'-ml{max_lag}-fdr{fdr_alpha}-{granularity}'
     )
 
 
@@ -56,6 +70,7 @@ def _single_regime_params(table: pd.DataFrame) -> tuple:
         int(row['max_lag']),
         float(row['fdr_alpha']),
         str(row['granularity']),
+        str(row['network_name']),
     )
 
 
@@ -78,6 +93,22 @@ def _add_pairs(graph: Graph, pairs: set[str]) -> None:
         graph.add((uri, FXPCN.quoteCurrency, currencies[quote]))
 
 
+def _add_networks(graph: Graph, edges: pd.DataFrame) -> None:
+    """One `fxpcn:Network` per distinct `network_name` in `edges`, holding
+    the ordered pair universe (`fxpcn:hasPair`) that name refers to -- lets a
+    consumer resolve exactly which currency pairs a given regime's
+    `prov:Activity` (linked here via `fxpcn:network`) was actually built
+    from, not just how many edges it happened to produce."""
+    distinct = edges[['network_name', 'pairs']].drop_duplicates()
+    for _, row in distinct.iterrows():
+        network_name = str(row['network_name'])
+        uri = _network_uri(network_name)
+        graph.add((uri, RDF.type, FXPCN.Network))
+        graph.add((uri, FXPCN.label, Literal(network_name)))
+        for pair in str(row['pairs']).split(','):
+            graph.add((uri, FXPCN.hasPair, _pair_uri(pair)))
+
+
 def _add_activities(graph: Graph, edges: pd.DataFrame) -> dict[tuple, URIRef]:
     distinct = edges[_RUN_PARAM_COLUMNS].drop_duplicates()
     activities: dict[tuple, URIRef] = {}
@@ -88,8 +119,17 @@ def _add_activities(graph: Graph, edges: pd.DataFrame) -> dict[tuple, URIRef]:
         max_lag = int(row['max_lag'])
         fdr_alpha = float(row['fdr_alpha'])
         granularity = str(row['granularity'])
+        network_name = str(row['network_name'])
 
-        params = (window_days, step_days, min_observations, max_lag, fdr_alpha, granularity)
+        params = (
+            window_days,
+            step_days,
+            min_observations,
+            max_lag,
+            fdr_alpha,
+            granularity,
+            network_name,
+        )
         uri = _activity_uri(params)
         activities[params] = uri
         graph.add((uri, RDF.type, PROV.Activity))
@@ -99,19 +139,23 @@ def _add_activities(graph: Graph, edges: pd.DataFrame) -> dict[tuple, URIRef]:
         graph.add((uri, FXPCN.maxLag, Literal(max_lag, datatype=XSD.integer)))
         graph.add((uri, FXPCN.fdrAlpha, Literal(fdr_alpha, datatype=XSD.double)))
         graph.add((uri, FXPCN.granularity, Literal(granularity)))
+        graph.add((uri, FXPCN.networkName, Literal(network_name)))
+        graph.add((uri, FXPCN.network, _network_uri(network_name)))
     return activities
 
 
 def _add_edges(graph: Graph, edges: pd.DataFrame) -> None:
     """One `fxpcn:EdgeObservation` per (date, pair_i, pair_j, regime) row.
 
-    The regime slug is folded into the URI (not just reachable via
-    `prov:wasGeneratedBy`) because different regimes' `.ttl` exports get
-    loaded into the same Neo4j graph via n10s (see
+    The regime slug (now including the network name -- see `_regime_slug`)
+    is folded into the URI (not just reachable via `prov:wasGeneratedBy`)
+    because different regimes' -- and, since `--pairs`/`--network-name`,
+    different networks' -- `.ttl` exports get loaded into the same Neo4j
+    graph via n10s (see
     operation-clusterfuck/scripts/.../load-ttl-files-into-Neo4j.cypher) --
-    without it, two regimes observing the same (date, pair_i, pair_j) would
-    collide on n10s's unique-URI constraint and silently overwrite each
-    other's properties.
+    without it, two regimes (or two differently-scoped networks) observing
+    the same (date, pair_i, pair_j) would collide on n10s's unique-URI
+    constraint and silently overwrite each other's properties.
 
     `fxpcn:source`/`fxpcn:target` are only emitted when the row's `direction`
     names a single unambiguous leader (`i->j` or `j->i`) -- mirroring
@@ -122,7 +166,9 @@ def _add_edges(graph: Graph, edges: pd.DataFrame) -> None:
     `fxpcn:pairA`/`fxpcn:pairB` (always present, unordered) plus the
     `fxpcn:direction` literal itself.
     """
-    _add_pairs(graph, set(edges['pair_i']) | set(edges['pair_j']))
+    all_pairs = {pair for pairs_csv in edges['pairs'].unique() for pair in pairs_csv.split(',')}
+    _add_pairs(graph, all_pairs)
+    _add_networks(graph, edges)
     activities = _add_activities(graph, edges)
 
     for _, row in edges.iterrows():
@@ -138,6 +184,7 @@ def _add_edges(graph: Graph, edges: pd.DataFrame) -> None:
             int(row['max_lag']),
             float(row['fdr_alpha']),
             str(row['granularity']),
+            str(row['network_name']),
         )
         regime_slug = _regime_slug(params)
         obs = KG[f'edge-observation/{row["date"]}/{pair_a_slug}-{pair_b_slug}/{regime_slug}']

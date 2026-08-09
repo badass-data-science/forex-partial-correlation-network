@@ -4,17 +4,17 @@ from pathlib import Path
 
 import pandas as pd
 
-from fx_pcn import config
 from fx_pcn.incremental import merge_incremental
-
-_MAX_POSSIBLE_EDGES = len(config.PAIRS) * (len(config.PAIRS) - 1) // 2
+from fx_pcn.network import pairs_from_edges
 
 
 def compute_density_table(edges: pd.DataFrame) -> pd.DataFrame:
     """One row per date summarizing that day's graph: edge count and density
-    (as a fraction of the `_MAX_POSSIBLE_EDGES` possible over the full pair
-    universe), mean |partial_corr| among the edges the lasso penalty kept,
-    and how many of those edges came out directed vs bidirected vs undirected.
+    (as a fraction of the max possible over `edges`'s own pair universe --
+    see network.pairs_from_edges, not a fixed constant, since `edges` may
+    have been built from any --pairs set, not just the default majors), mean
+    |partial_corr| among the edges the lasso penalty kept, and how many of
+    those edges came out directed vs bidirected vs undirected.
 
     A date with zero edges (the lasso penalty zeroed every pair that window)
     has no rows in `edges` at all -- see network.build_edge_table -- so it's
@@ -51,7 +51,9 @@ def compute_density_table(edges: pd.DataFrame) -> pd.DataFrame:
         )
         .reset_index()
     )
-    density['density'] = density['edge_count'] / _MAX_POSSIBLE_EDGES
+    pairs = pairs_from_edges(edges)
+    max_possible_edges = len(pairs) * (len(pairs) - 1) // 2
+    density['density'] = density['edge_count'] / max_possible_edges
 
     columns = [
         'date',

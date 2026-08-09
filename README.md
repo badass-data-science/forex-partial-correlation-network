@@ -7,15 +7,20 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 A time-varying partial-correlation network, with Granger-causal edge
-direction, over the 7 major FX pairs (`EUR/USD`, `GBP/USD`, `USD/JPY`,
-`USD/CHF`, `USD/CAD`, `AUD/USD`, `NZD/USD`).
+direction, over a configurable set of FX pairs — by default the 7 majors
+(`EUR/USD`, `GBP/USD`, `USD/JPY`, `USD/CHF`, `USD/CAD`, `AUD/USD`, `NZD/USD`),
+named `forex-network-seven-majors`.
 
 For each day, the pipeline looks back over a trailing window of hourly bars and
 asks two questions of every pair of currencies: *are these two conditionally
 dependent right now, net of everyone else's influence?* and, if so, *which one
-is leading the other?* The result is a graph — nodes are the 7 pairs, edges are
-the relationships that window supports — and because it's refit on every date
-in the series, that graph can be watched evolving over time.
+is leading the other?* The result is a graph — nodes are the network's pairs,
+edges are the relationships that window supports — and because it's refit on
+every date in the series, that graph can be watched evolving over time.
+
+Pass `--pairs` to build the network from a different (or larger/smaller) set
+of currency pairs instead of the default 7 majors — see [Custom pair
+sets](#custom-pair-sets) below.
 
 ## Installation
 
@@ -117,6 +122,8 @@ fx-pcn generate-report --edges output/edges.parquet --output output/report.html
 | Flag | Default | Meaning |
 |---|---|---|
 | `--output` | *(required)* | Parquet path to write the edge table to |
+| `--pairs` | the 7 majors | Currency pairs to build the network from, e.g. `--pairs EUR/USD USD/CHF GBP/USD`. Requires `--network-name` whenever given |
+| `--network-name` | `forex-network-seven-majors` | Name for the resulting network — recorded on every output row and folded into RDF URIs. Required whenever `--pairs` is given |
 | `--days` | full history since 2015 | Only pull the last N days |
 | `--window-days` | 5 | Trailing window size, in days |
 | `--step-days` | 1 | Days between successive windows |
@@ -132,6 +139,39 @@ stay distinguishable — and safely concatenatable — after the fact.
 
 `render-graph` takes `--input` (an edge-table parquet) and `--output` (a PNG
 path), both required, and always renders the *most recent* date in that table.
+
+### Custom pair sets
+
+By default, `run-pipeline` builds the network from the 7 major FX pairs,
+named `forex-network-seven-majors`. Pass `--pairs` to use a different set
+instead — any pairs your InfluxDB bucket has data for, not just a subset of
+the majors:
+
+```bash
+fx-pcn run-pipeline \
+  --output output/edges-european-majors.parquet \
+  --pairs EUR/USD USD/CHF GBP/USD \
+  --network-name forex-network-european-majors
+```
+
+`--network-name` is **required** whenever `--pairs` is given — there's no
+auto-generated fallback name. The point of naming a pair set is to keep it
+distinguishable from every other network downstream (in the edge table
+itself, in `compute-density`/`find-direction-flips`, in the HTML report, and
+in RDF — see below), so a custom pair set is never allowed to pass through
+silently unnamed. `--network-name` alone (without `--pairs`) is also allowed,
+to rename the default 7-majors network without changing its pair set.
+
+`network_name` and `pairs` (the ordered pair list, comma-joined) are recorded
+as columns on every edge-table row, the same way `window_days`/`granularity`/
+etc. already are — every downstream command (`compute-density`,
+`find-direction-flips`, `generate-report`, `export-rdf`) reads the network's
+identity back out of the edge table it's given, so only `run-pipeline` itself
+needs `--pairs`/`--network-name`. Use a different `--output` path per network
+(as in the example above) — `run-pipeline --append` refuses to append rows
+for one `--network-name` into a file already holding a different one, since
+that would silently mix two networks' rows into a single table that every
+downstream consumer assumes describes exactly one.
 
 ### Incremental updates (`--append`)
 
@@ -243,8 +283,10 @@ $$
 $$
 
 where $E_t$ is the set of edges present on date *t* and 21 = C(7,2) is every
-possible pair among the 7 majors. Alongside these it also tallies how many of
-that date's edges are `i->j`/`j->i`, `i<->j` (bidirected), or `undirected`.
+possible pair among the default 7 majors (C(*n*, 2) for an *n*-pair `--pairs`
+network — see [Custom pair sets](#custom-pair-sets)). Alongside these it also
+tallies how many of that date's edges are `i->j`/`j->i`, `i<->j` (bidirected),
+or `undirected`.
 Tracking this over time turns "is the graph getting denser/stronger" from a
 mental exercise — scanning 20-odd rows a day by eye — into a single number per
 date.
@@ -253,8 +295,9 @@ date.
 graph today" but "did any specific relationship just change." A missing row
 for a pair on some date means the lasso penalty zeroed it out (no edge), and
 treating that as absent data would make disappearance invisible — so the full
-21-pair grid is reconstructed for every date, with a fifth state, `no_edge`,
-filled in wherever a pair has no row that date. Comparing each pair's state on
+pairwise grid (every combination in the network's `--pairs`) is reconstructed
+for every date, with a fifth state, `no_edge`, filled in wherever a pair has
+no row that date. Comparing each pair's state on
 date *t* to its state on the previous date *actually present* in the table
 (not necessarily the calendar day before, if `--step-days` skips days) flags
 every pair whose state just changed: an edge appearing or disappearing, a
@@ -428,11 +471,13 @@ that date's skeleton fit:
 | `granger_p_i_to_j`, `granger_p_j_to_i` | Raw (pre-FDR) Granger p-values in each direction |
 | `direction` | `i->j`, `j->i`, `i<->j`, or `undirected` (after FDR correction) |
 | `window_days`, `step_days`, `min_observations`, `max_lag`, `fdr_alpha`, `granularity` | The run's settings, carried on every row |
+| `network_name` | The `--network-name` this row's network was built under (default: `forex-network-seven-majors`) |
+| `pairs` | The full `--pairs` list this network was built from, comma-joined, in the order given (default: the 7 majors) — the authoritative pair universe, since a pair the lasso penalty always zeroed out never otherwise appears in `pair_i`/`pair_j` |
 
-Filtering to a single `date` gives that day's graph: nodes are the 7 pairs,
-edges are the rows for that date. Pairs with no row for a given date had their
-partial correlation zeroed out by the lasso penalty that window — i.e., no
-edge, not missing data.
+Filtering to a single `date` gives that day's graph: nodes are the network's
+pairs, edges are the rows for that date. Pairs with no row for a given date
+had their partial correlation zeroed out by the lasso penalty that window —
+i.e., no edge, not missing data.
 
 ## Derived analyses
 
@@ -457,7 +502,7 @@ whole:
 |---|---|
 | `date` | The date being summarized |
 | `edge_count` | Number of edges the lasso penalty kept that date |
-| `density` | `edge_count` divided by 21 (all possible pairs among the 7 majors) |
+| `density` | `edge_count` divided by the network's own max possible edges (21 for the default 7 majors; `C(n, 2)` for an `n`-pair `--pairs` network) |
 | `mean_abs_partial_corr` | Mean `\|partial_corr\|` across that date's edges |
 | `directed_edge_count`, `bidirected_edge_count`, `undirected_edge_count` | How many of that date's edges came out each way |
 
@@ -517,12 +562,13 @@ inventing that part too:
 
 | Node | Meaning |
 |---|---|
-| `fxpcn:CurrencyPair` | One of the 7 majors (e.g. `kg:pair/EURUSD`), with an `fxpcn:label` (e.g. `"EUR/USD"`) and `fxpcn:baseCurrency`/`fxpcn:quoteCurrency` pointing at its two `fxpcn:Currency` entities |
+| `fxpcn:CurrencyPair` | One of the network's pairs (e.g. `kg:pair/EURUSD`), with an `fxpcn:label` (e.g. `"EUR/USD"`) and `fxpcn:baseCurrency`/`fxpcn:quoteCurrency` pointing at its two `fxpcn:Currency` entities |
 | `fxpcn:Currency` | One per currency code (8 for the default 7-pair universe), with `fxpcn:region` (always) and `fxpcn:institution` (only where one exists — see below) pointing at `skos:Concept` nodes |
+| `fxpcn:Network` | One per distinct `network_name` in the edge table, at `kg:network/<slugified-name>`: `fxpcn:label` (the unslugified name) and one `fxpcn:hasPair` per pair in that network's `--pairs` list — including a pair that never had a single surviving edge, since it's read from the edge table's `pairs` column, not inferred from `pair_i`/`pair_j` |
 | `fxpcn:EdgeObservation` | One per edge-table row: `fxpcn:date`, `fxpcn:pairA`/`fxpcn:pairB` (always present, unordered), `fxpcn:partialCorrelation`, `fxpcn:direction`, `fxpcn:grangerPValuePairAToPairB`/`...PairBToPairA` |
 | `fxpcn:NetworkSnapshot` | One per `compute-density` row: `fxpcn:date`, `fxpcn:edgeCount`, `fxpcn:density`, `fxpcn:meanAbsPartialCorrelation`, and the directed/bidirected/undirected counts |
 | `fxpcn:DirectionFlip` | One per `find-direction-flips` row: `fxpcn:date`, `fxpcn:pairA`/`fxpcn:pairB`, `fxpcn:previousDirection`, `fxpcn:newDirection` |
-| `prov:Activity` | One per distinct `(window_days, step_days, min_observations, max_lag, fdr_alpha, granularity)` combination present in the edge table, pointed at by every `EdgeObservation` it produced via `prov:wasGeneratedBy` |
+| `prov:Activity` | One per distinct `(window_days, step_days, min_observations, max_lag, fdr_alpha, granularity, network_name)` combination present in the edge table, pointed at by every `EdgeObservation` it produced via `prov:wasGeneratedBy`; also links to its `fxpcn:Network` via `fxpcn:network` and carries `fxpcn:networkName` directly |
 
 `fxpcn:source`/`fxpcn:target` are only added to an `EdgeObservation` when its
 `direction` names a single unambiguous leader (`i->j` or `j->i`) — a
@@ -537,13 +583,16 @@ table's export as independent as the pure functions that produced the tables
 themselves.
 
 `EdgeObservation`/`NetworkSnapshot`/`DirectionFlip` URIs each fold in a
-regime slug (e.g. `.../w60-s7-mo30-ml3-fdr0.05-D`), not just the date and
-pair(s) — [Automated daily runs](#automated-daily-runs-prefect) produces one
-`.ttl` per regime, and those get loaded into the same Neo4j graph via n10s
-(see the ops runbook's `load-ttl-files-into-Neo4j.cypher`), which enforces a
-unique-URI constraint. Without the regime in the URI, two regimes observing
-the same date/pair would collide and silently overwrite each other's
-properties.
+regime slug that now also includes the (slugified) network name (e.g.
+`.../forex-network-seven-majors-w60-s7-mo30-ml3-fdr0.05-D`), not just the
+date and pair(s) — [Automated daily runs](#automated-daily-runs-prefect)
+produces one `.ttl` per regime, and those (plus any custom `--pairs`
+networks' exports) get loaded into the same Neo4j graph via n10s (see the ops
+runbook's `load-ttl-files-into-Neo4j.cypher`), which enforces a unique-URI
+constraint. Without both the regime *and* the network name in the URI, two
+regimes — or two differently-scoped networks under an otherwise identical
+regime — observing the same date/pair would collide and silently overwrite
+each other's properties.
 
 ### HTML report
 

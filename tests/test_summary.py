@@ -14,7 +14,10 @@ _RUN_PARAMS = {
     'max_lag': 4,
     'fdr_alpha': 0.05,
     'granularity': 'H1',
+    'network_name': 'forex-network-seven-majors',
 }
+
+_TEST_PAIRS = 'EUR/USD,GBP/USD,USD/JPY,USD/CHF,USD/CAD,AUD/USD,NZD/USD'
 
 
 def _edges_row(**overrides: object) -> dict:
@@ -25,6 +28,7 @@ def _edges_row(**overrides: object) -> dict:
         'granger_p_i_to_j': 0.01,
         'granger_p_j_to_i': 0.8,
         'direction': 'EUR/USD->USD/CAD',
+        'pairs': _TEST_PAIRS,
         **_RUN_PARAMS,
     }
     row.update(overrides)
