@@ -22,6 +22,10 @@
   .about dl { margin: .75rem 0 0; }
   .about dt { font-weight: 600; color: #111; }
   .about dd { margin: 0 0 .6rem; color: #333; }
+  .toc { background: #f9f9f9; border: 1px solid #e8e8e8; border-radius: 4px;
+         padding: 1rem 1.25rem; margin: 1.5rem 0 2rem; }
+  .toc h2 { margin-top: 0; font-size: 1.1rem; color: #111; }
+  .toc ul { margin: .4rem 0 0; }
 </style>
 {% endblock %}
 
@@ -42,7 +46,20 @@
   </ul>
 </div>
 
-<div class="about">
+<nav class="toc">
+  <h2>Table of Contents</h2>
+  <ul>
+    <li><a href="#about">About this report</a></li>
+    <li><a href="#network-graph">Network graph</a></li>
+    <li><a href="#recent-data">Most recent density data</a></li>
+    <li><a href="#recent-direction-changes">Most recent direction changes</a></li>
+    <li><a href="#distributions">Distributions — full history</a></li>
+    <li><a href="#trends">Trends — last year</a></li>
+    <li><a href="#summary">Qualitative summary</a></li>
+  </ul>
+</nav>
+
+<div class="about" id="about">
   <h2>About this report</h2>
   <p>This report tracks a statistical network built from the returns of the 7 major FX
     pairs. For each date, every pair of currencies is checked for a direct relationship
