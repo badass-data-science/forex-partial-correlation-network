@@ -23,7 +23,7 @@ from typing import TypedDict
 
 from prefect import flow, get_run_logger, task
 
-from fx_pcn import config, density, direction_flips, pipeline, rdf_export, render_graph
+from fx_pcn import config, density, direction_flips, pipeline, rdf_export, render_graph, report
 
 DEFAULT_OUTPUT_DIR = Path.home() / 'output' / 'forex-partial-correlation-network'
 
@@ -127,9 +127,10 @@ def regime_output_path(
 
 @task(retries=3, retry_delay_seconds=30)
 def _run_pipeline_task(output_path: Path, params: RegimeParams) -> None:
-    """Only this task hits InfluxDB -- the other four are local/fast and
-    don't need the same retry policy `ETL-forex-time-series-data` uses for
-    its I/O-heavy steps."""
+    """This task hits InfluxDB; `_generate_report_task` below is the only
+    other one with a retry policy, for the same reason (a network call --
+    the LLM summary -- rather than InfluxDB). The remaining tasks are
+    local/fast and don't need one."""
     logger = get_run_logger()
     edges = pipeline.run(
         output_path=output_path,
@@ -171,11 +172,19 @@ def _export_rdf_task(
     rdf_export.run(edges_path, output_path, density_path=density_path, flips_path=flips_path)
 
 
+@task(retries=3, retry_delay_seconds=30)
+def _generate_report_task(
+    edges_path: Path, output_path: Path, density_path: Path, flips_path: Path
+) -> None:
+    report.run(edges_path, output_path, density_path=density_path, flips_path=flips_path)
+
+
 @flow(name='fx-pcn-regime-pipeline', log_prints=True)
 def regime_pipeline_flow(regime: str, output_dir: str = str(DEFAULT_OUTPUT_DIR)) -> None:
     """Runs the full artifact chain (edges -> density -> direction flips ->
-    graph PNG -> RDF export) for one named entry in `REGIME_PARAMS`,
-    `--append`ing each parquet rather than rebuilding it from scratch."""
+    graph PNG -> RDF export -> HTML report) for one named entry in
+    `REGIME_PARAMS`, `--append`ing each parquet rather than rebuilding it
+    from scratch."""
     params = REGIME_PARAMS[regime]
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -188,12 +197,14 @@ def regime_pipeline_flow(regime: str, output_dir: str = str(DEFAULT_OUTPUT_DIR))
     flips_path = path_for('direction', 'parquet')
     graph_path = path_for('graph-most-recent-window', 'png')
     rdf_path = path_for('RDF', 'ttl')
+    report_path = path_for('report', 'html')
 
     _run_pipeline_task(edges_path, params)
     _compute_density_task(edges_path, density_path)
     _find_direction_flips_task(edges_path, flips_path)
     _render_graph_task(edges_path, graph_path)
     _export_rdf_task(edges_path, rdf_path, density_path, flips_path)
+    _generate_report_task(edges_path, report_path, density_path, flips_path)
 
 
 if __name__ == '__main__':

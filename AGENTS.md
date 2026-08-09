@@ -40,9 +40,10 @@ rolling window of H1 bars it:
      --base-iri https://fx-pcn.local/kg/
    graph-nexus link fx-pcn --repo-root /home/emily/output/graph-nexus
    ```
-8. Optionally runs all of the above (steps 1-6, plus RDF export for regimes
-   that need it) automatically every weekday at 6:30pm Eastern, for four of
-   the five parameter regimes in README's "Other parameter regimes" table
+8. Optionally runs all of the above (steps 1-6, plus RDF export and HTML
+   report generation for regimes that need it) automatically every weekday
+   at 6:30pm Eastern, for four of the five parameter regimes in README's
+   "Other parameter regimes" table
    (`flows.py`, Prefect -- see README's "Automated daily runs (Prefect)"
    for the regime table, exact `REGIME_PARAMS` values, and the systemd
    unit). Follows the same shared-local-server-plus-per-project-`.serve()`

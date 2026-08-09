@@ -57,3 +57,18 @@ def test_default_regime_matches_existing_config_defaults():
 
 def test_all_four_regimes_are_registered():
     assert set(REGIME_PARAMS) == {'default', 'intraday', 'macro', 'policy'}
+
+
+def test_report_path_uses_html_extension():
+    kwargs = {
+        'window_days': 5,
+        'step_days': 1,
+        'min_observations': 60,
+        'max_lag': 4,
+        'fdr_alpha': 0.05,
+        'granularity': 'H1',
+    }
+    report_path = regime_output_path(Path('/out'), 'report', ext='html', **kwargs)
+
+    assert report_path.name.startswith('report---')
+    assert report_path.suffix == '.html'
