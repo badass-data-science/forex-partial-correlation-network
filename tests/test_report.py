@@ -179,6 +179,10 @@ def test_generate_report_writes_self_contained_html(tmp_path):
     assert 'd3js.org' in html  # vendored D3 bundle is inlined, not CDN-linked
     # caption used to be baked into the Graphviz PNG; now it's plain HTML text
     assert 'Blue = positive, red = negative partial correlation' in html
+    assert 'About this report' in html
+    for term in ('Partial correlation', 'Granger causality', 'Density',
+                 'Mean absolute partial correlation', 'Direction'):
+        assert term in html
     assert 'LLM summary skipped' in html
 
 
