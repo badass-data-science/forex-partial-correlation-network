@@ -404,11 +404,15 @@ numeric suffix (only sub-daily codes like `H1`/`M15` do); this tripped up
 an earlier version of this table too.
 
 Every artifact this produces lands in `~/output/forex-partial-correlation-network/`
-using the same `<artifact>---window-days-N---step-days-N---min-observations-N---max-lag-N---fdr-alpha-N---granularity-X.<ext>`
-naming already used for manual runs, via `regime_output_path()` — so a
-scheduled `macro` run and a manual `default` run never collide, and every
-file on disk is traceable to the exact regime that produced it without
-opening it.
+using the `<artifact>---network-name-X---window-days-N---step-days-N---min-observations-N---max-lag-N---fdr-alpha-N---granularity-X.<ext>`
+naming convention, via `regime_output_path()` — so a scheduled `macro` run
+and a manual `default` run never collide, and every file on disk is
+traceable to the exact network and regime that produced it without opening
+it. All four scheduled regimes currently use the same default
+`forex-network-seven-majors` network — `network_name` is folded into the
+filename (not just `window_days`/etc.) so that if a future regime ever used
+a different `--pairs` network under an otherwise identical regime, it
+wouldn't silently collide with this one on disk.
 
 ### Running the scheduler
 
