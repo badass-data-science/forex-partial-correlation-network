@@ -682,7 +682,7 @@ generating/inspecting the bullets table without also rendering the HTML.)
 
 | Node | Meaning |
 |---|---|
-| `fxpcn:QualitativeSummaryRun` | One per report date, at `kg:summary-run/<date>/<regime-slug>`: `fxpcn:date`, `fxpcn:llmModel` (the `litellm` model string), and one `fxpcn:takeawayBullet` literal per bullet |
+| `fxpcn:QualitativeSummaryRun` | One per report date, at `kg:summary-run/<date>/<regime-slug>`: `fxpcn:date`, `fxpcn:llmModel` (the `litellm` model string), `fxpcn:networkName`/`fxpcn:network` (see below), and one `fxpcn:takeawayBullet` literal per bullet |
 
 Each `QualitativeSummaryRun` links to that regime's `prov:Activity` (the
 same node `export-rdf` mints — see above) via `prov:wasInformedBy`, not
@@ -691,6 +691,15 @@ from that activity," rather than claiming the deterministic pipeline itself
 produced the summary. That distinction, plus `fxpcn:llmModel`, is what lets
 a consumer filter LLM-derived opinion out of hard numeric fact by `rdf:type`
 alone.
+
+`fxpcn:networkName`/`fxpcn:network` are also asserted directly on the
+`QualitativeSummaryRun` node itself, not just reachable by resolving
+`wasInformedBy`'s target — that target's own `fxpcn:networkName` triple only
+exists in `export-rdf`'s output, a separate `.ttl` file graph-nexus can
+register as an independent source. Without asserting it here too, a
+`graph-nexus-ask` query against just the summary graph (not merged with its
+numeric sibling in the same store) would have no way to filter or identify
+runs by network name at all.
 
 This is deliberately a second, independent `.ttl` file rather than folded
 into `export-rdf`'s output: the numeric graph must stay exportable even

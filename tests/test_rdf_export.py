@@ -358,6 +358,21 @@ def test_build_summary_graph_links_to_same_activity_as_numeric_export():
     assert (run, PROV.wasInformedBy, _activity_uri(params)) in graph
 
 
+def test_build_summary_graph_asserts_network_name_directly_on_each_run():
+    """A consumer querying the summary graph on its own -- not merged with
+    its numeric sibling .ttl in the same store -- must still be able to
+    filter/identify runs by network name, so this can't only live on the
+    Activity node `wasInformedBy` points at (that node's own properties are
+    only asserted in build_graph's output, a separate file)."""
+    bullets = pd.DataFrame([_bullets_row(network_name='forex-network-european-majors')])
+
+    graph = build_summary_graph(bullets)
+
+    (run,) = graph.subjects(RDF.type, FXPCN.QualitativeSummaryRun)
+    assert (run, FXPCN.networkName, Literal('forex-network-european-majors')) in graph
+    assert (run, FXPCN.network, _network_uri('forex-network-european-majors')) in graph
+
+
 def test_build_summary_graph_rejects_ambiguous_multi_regime_bullets():
     bullets = pd.DataFrame(
         [_bullets_row(), _bullets_row(granularity='D', window_days=60, step_days=7)]

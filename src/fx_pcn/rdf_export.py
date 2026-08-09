@@ -356,6 +356,15 @@ def build_summary_graph(bullets: pd.DataFrame) -> Graph:
     deterministic pipeline itself produced the summary. That, plus
     `fxpcn:llmModel`, lets a consumer filter LLM opinion out of hard numeric
     fact by `rdf:type` alone.
+
+    Each run also asserts `fxpcn:networkName`/`fxpcn:network` directly on
+    itself, not just reachable by resolving `wasInformedBy`'s target -- that
+    target's own `fxpcn:networkName` triple only exists in `build_graph`'s
+    (the numeric export's) output, a separate `.ttl` file graph-nexus can
+    register as an independent source. Without asserting it here too, a
+    consumer querying this summary graph on its own (not merged with its
+    numeric sibling in the same store) would have no way to filter or
+    identify runs by network name at all.
     """
     graph = Graph()
     _bind_namespaces(graph)
@@ -365,6 +374,8 @@ def build_summary_graph(bullets: pd.DataFrame) -> Graph:
     params = _single_regime_params(bullets)
     activity_uri = _activity_uri(params)
     regime_slug = _regime_slug(params)
+    network_name = str(bullets['network_name'].iloc[0])
+    network_uri = _network_uri(network_name)
 
     for date, rows in bullets.groupby('date', sort=True):
         run_uri = KG[f'summary-run/{date}/{regime_slug}']
@@ -372,6 +383,8 @@ def build_summary_graph(bullets: pd.DataFrame) -> Graph:
         graph.add((run_uri, RDF.type, PROV.Activity))
         graph.add((run_uri, FXPCN.date, Literal(date, datatype=XSD.date)))
         graph.add((run_uri, FXPCN.llmModel, Literal(str(rows.iloc[0]['model']))))
+        graph.add((run_uri, FXPCN.networkName, Literal(network_name)))
+        graph.add((run_uri, FXPCN.network, network_uri))
         graph.add((run_uri, PROV.wasInformedBy, activity_uri))
         for _, row in rows.sort_values('bullet_index').iterrows():
             graph.add((run_uri, FXPCN.takeawayBullet, Literal(str(row['bullet_text']))))
