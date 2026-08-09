@@ -53,6 +53,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     `fx_pcn.summary`'s LLM prompt likewise names the network and its pairs
     instead of assuming "the 7 major currency pairs".
 
+### Fixed
+- `run-pipeline --append`: the network-name mismatch guard above crashed
+  with `KeyError('network_name')` against any edge-table parquet written
+  before this feature existed (no `network_name`/`pairs` columns at all) --
+  broke the scheduled `flows.py` `--append` runs against real production
+  output on first deploy. `pipeline.run` now backfills a legacy file as the
+  default 7-majors network (`config.DEFAULT_NETWORK_NAME`/`config.PAIRS`) in
+  memory the first time `--append` touches it, then persists the migrated
+  schema on the normal full-table rewrite -- a straight migration, not a
+  guess, since every edge table written before this feature always was the
+  7-majors network.
+
 ### Added
 - `generate-summary`/`export-summary-rdf`: the LLM qualitative summary's
   strategic takeaways are now also available as RDF (`fx_pcn.summary`, new
