@@ -44,11 +44,23 @@ def run(
     an existing table would silently conflate two distinct networks in one
     file, which every downstream consumer (density.py, direction_flips.py,
     rdf_export.py) assumes can't happen (see network.pairs_from_edges).
+
+    A file written before `network_name`/`pairs` existed as columns (i.e.
+    before --pairs/--network-name at all) is backfilled in memory as the
+    default 7-majors network the first time `--append` touches it here --
+    every edge table that predates this feature was always built from
+    `config.PAIRS`, so this is a straight migration, not a guess -- and the
+    full rewrite below (`edges.to_parquet`) persists it, so this only ever
+    happens once per file.
     """
     existing: pd.DataFrame | None = None
     last_date: datetime.date | None = None
     if append and output_path.exists():
         existing = pd.read_parquet(output_path)
+        if 'network_name' not in existing.columns:
+            existing = existing.copy()
+            existing['network_name'] = config.DEFAULT_NETWORK_NAME
+            existing['pairs'] = ','.join(config.PAIRS)
         existing_network_name = str(existing['network_name'].iloc[0])
         if existing_network_name != network_name:
             raise ValueError(
