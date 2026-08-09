@@ -323,8 +323,15 @@ def _build_summary_prompt(
         'Write a brief (3-5 paragraph) qualitative summary interpreting this data '
         'for someone monitoring FX market structure: what the current network '
         'density and directionality suggest, how it compares to the historical '
-        'distribution, and what the recent direction changes might indicate. Do '
-        'not invent numbers not given above. Do not give trading advice.',
+        'distribution, and what the recent direction changes might indicate. End '
+        'with strategic, actionable takeaways: diversification/hedging '
+        'implications of the current density and correlation-strength regime, '
+        'which relationships are worth actively monitoring given the recent '
+        'direction changes, and what would confirm or invalidate this read going '
+        'forward. Do not invent numbers not given above. Keep any actionable '
+        'framing at the level of market structure and risk monitoring -- do not '
+        'give specific trading advice (no buy/sell/position-sizing '
+        'recommendations, no calls on individual trades).',
     ]
     return '\n'.join(lines)
 
