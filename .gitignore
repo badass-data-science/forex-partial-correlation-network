@@ -5,3 +5,10 @@ __pycache__/
 output/
 .pytest_cache/
 *.egg-info/
+
+# graphify: keep only the three human-facing artifacts, ignore the rest
+# (cache/, manifest.json, cost.json, .graphify_* state files)
+graphify-out/*
+!graphify-out/graph.html
+!graphify-out/GRAPH_REPORT.md
+!graphify-out/graph.json

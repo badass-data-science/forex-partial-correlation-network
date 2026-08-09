@@ -126,3 +126,14 @@ output.
 No `.env` file, by design — `INFLUXDB_URL`/`INFLUXDB_TOKEN`/`INFLUXDB_ORG`/`INFLUXDB_BUCKET`
 must already be set in the calling shell's environment (see README.md). Don't
 reintroduce a `.env`/`python-dotenv` loading path.
+
+## Knowledge graph (graphify)
+
+`graphify-out/graph.json` (plus `graph.html`, `GRAPH_REPORT.md`) is a
+`graphify`-generated knowledge graph of this repo, tracked in git — see
+README's "Repository knowledge graph (graphify)" section. If asked a
+natural-language question about this codebase and `graphify-out/graph.json`
+exists, prefer `graphify query "<question>"` over re-reading files from
+scratch. `graphify-out/cache/`, `manifest.json`, `cost.json`, and `.graphify_*`
+state files are gitignored and regenerated on each run -- don't hand-edit or
+commit them.
