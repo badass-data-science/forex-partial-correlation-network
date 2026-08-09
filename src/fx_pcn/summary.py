@@ -9,6 +9,7 @@ import litellm
 import pandas as pd
 
 from fx_pcn.incremental import merge_incremental
+from fx_pcn.network import pairs_from_edges
 
 _DEFAULT_MODEL = os.environ.get('LLM_MODEL', 'ollama_chat/glm-5.2:cloud')
 
@@ -19,6 +20,7 @@ _RUN_PARAM_COLUMNS = [
     'max_lag',
     'fdr_alpha',
     'granularity',
+    'network_name',
 ]
 
 _DENSITY_TABLE_COLUMNS = [
@@ -60,6 +62,7 @@ def run_params(edges: pd.DataFrame) -> dict:
         'max_lag': int(row['max_lag']),
         'fdr_alpha': float(row['fdr_alpha']),
         'granularity': str(row['granularity']),
+        'network_name': str(row['network_name']),
     }
 
 
@@ -101,14 +104,16 @@ def recent_flip_rows(flips: pd.DataFrame, n: int = 10) -> list[dict]:
 def _build_prompt(
     report_date: datetime.date,
     params: dict,
+    pairs: list[str],
     density: pd.DataFrame,
     recent_density: list[dict],
     recent_flips: list[dict],
 ) -> str:
     stats = density[['density', 'mean_abs_partial_corr']].describe()
     lines = [
-        'You are analyzing a time-varying FX partial-correlation network over the '
-        '7 major currency pairs. Each date is a graph: nodes are currency pairs, '
+        f'You are analyzing a time-varying FX partial-correlation network, '
+        f'"{params["network_name"]}", over {len(pairs)} currency pairs '
+        f'({", ".join(pairs)}). Each date is a graph: nodes are currency pairs, '
         'edges are pairs found conditionally dependent (via graphical lasso) that '
         'window, oriented where Granger causality found a significant lead-lag '
         'relationship.',
@@ -216,8 +221,9 @@ def generate_summary(
     skip the section/row rather than erroring."""
     report_date = density['date'].max()
     params = run_params(edges)
+    pairs = pairs_from_edges(edges)
     prompt = _build_prompt(
-        report_date, params, density, recent_density_rows(density), recent_flip_rows(flips)
+        report_date, params, pairs, density, recent_density_rows(density), recent_flip_rows(flips)
     )
     raw = _call_llm(prompt, model)
     if raw is None:

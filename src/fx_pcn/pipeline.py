@@ -26,6 +26,7 @@ def run(
     max_lag: int = config.MAX_LAG,
     fdr_alpha: float = config.FDR_ALPHA,
     granularity: str = config.GRANULARITY,
+    network_name: str = config.DEFAULT_NETWORK_NAME,
     append: bool = False,
 ) -> pd.DataFrame:
     """`start` is an RFC3339 timestamp (e.g. '2026-07-04T00:00:00Z'); defaults to
@@ -37,11 +38,24 @@ def run(
     from that date) to compute them, and the new rows are appended to the
     existing table rather than replacing it. If `output_path` doesn't exist
     yet, `append` has no effect -- this is a normal full run.
+
+    Raises if `append` targets a file already holding a *different*
+    `network_name` -- appending rows built from a different `pairs` list into
+    an existing table would silently conflate two distinct networks in one
+    file, which every downstream consumer (density.py, direction_flips.py,
+    rdf_export.py) assumes can't happen (see network.pairs_from_edges).
     """
     existing: pd.DataFrame | None = None
     last_date: datetime.date | None = None
     if append and output_path.exists():
         existing = pd.read_parquet(output_path)
+        existing_network_name = str(existing['network_name'].iloc[0])
+        if existing_network_name != network_name:
+            raise ValueError(
+                f'--append target {output_path} already holds network '
+                f'{existing_network_name!r}; refusing to append {network_name!r} rows '
+                'into it -- use a different --output path for a different network'
+            )
         last_date = existing['date'].max()
         start = (pd.Timestamp(last_date) - pd.Timedelta(days=window_days)).strftime(
             '%Y-%m-%dT%H:%M:%SZ'
@@ -68,6 +82,7 @@ def run(
         max_lag=max_lag,
         fdr_alpha=fdr_alpha,
         granularity=granularity,
+        network_name=network_name,
     )
 
     if existing is not None:

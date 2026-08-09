@@ -6,7 +6,15 @@ from rdflib import RDF, XSD, Literal
 from rdflib.namespace import PROV
 
 from fx_pcn.macro_vocabulary import _currency_uri
-from fx_pcn.rdf_export import FXPCN, _activity_uri, _pair_uri, build_graph, build_summary_graph
+from fx_pcn.rdf_export import (
+    FXPCN,
+    _activity_uri,
+    _network_uri,
+    _pair_uri,
+    _slugify,
+    build_graph,
+    build_summary_graph,
+)
 
 _RUN_PARAMS = {
     'window_days': 5,
@@ -15,7 +23,10 @@ _RUN_PARAMS = {
     'max_lag': 4,
     'fdr_alpha': 0.05,
     'granularity': 'H1',
+    'network_name': 'forex-network-seven-majors',
 }
+
+_TEST_PAIRS = 'EUR/USD,GBP/USD,USD/JPY,USD/CHF,USD/CAD,AUD/USD,NZD/USD'
 
 
 def _edges_row(**overrides):
@@ -27,6 +38,7 @@ def _edges_row(**overrides):
         'granger_p_i_to_j': 0.01,
         'granger_p_j_to_i': 0.8,
         'direction': 'EUR/USD->USD/CAD',
+        'pairs': _TEST_PAIRS,
         **_RUN_PARAMS,
     }
     row.update(overrides)
@@ -143,6 +155,56 @@ def test_edge_observation_uris_differ_across_regimes_for_same_date_and_pair():
     default_obs = next(default_graph.subjects(RDF.type, FXPCN.EdgeObservation))
     other_obs = next(other_graph.subjects(RDF.type, FXPCN.EdgeObservation))
     assert default_obs != other_obs
+
+
+def test_edge_observation_uris_differ_across_networks_for_same_regime_and_date():
+    """Same regression as above, but for two --pairs/--network-name networks
+    sharing an otherwise identical regime -- network_name must also be part
+    of the disambiguating regime slug, not just window/step/lag/etc."""
+    seven_majors_edge = _edges_row()
+    european_majors_edge = _edges_row(
+        network_name='forex-network-european-majors', pairs='EUR/USD,USD/CHF,GBP/USD'
+    )
+
+    seven_majors_graph = build_graph(pd.DataFrame([seven_majors_edge]))
+    european_majors_graph = build_graph(pd.DataFrame([european_majors_edge]))
+
+    seven_majors_obs = next(seven_majors_graph.subjects(RDF.type, FXPCN.EdgeObservation))
+    european_majors_obs = next(european_majors_graph.subjects(RDF.type, FXPCN.EdgeObservation))
+    assert seven_majors_obs != european_majors_obs
+
+
+def test_networks_are_typed_labeled_and_linked_to_their_pairs():
+    edges = pd.DataFrame(
+        [_edges_row(network_name='forex-network-european-majors', pairs='EUR/USD,USD/CHF,GBP/USD')]
+    )
+
+    graph = build_graph(edges)
+
+    uri = _network_uri('forex-network-european-majors')
+    assert (uri, RDF.type, FXPCN.Network) in graph
+    assert (uri, FXPCN.label, Literal('forex-network-european-majors')) in graph
+    assert (uri, FXPCN.hasPair, _pair_uri('EUR/USD')) in graph
+    assert (uri, FXPCN.hasPair, _pair_uri('USD/CHF')) in graph
+    assert (uri, FXPCN.hasPair, _pair_uri('GBP/USD')) in graph
+    # GBP/USD never appears as pair_i/pair_j (only EUR/USD-USD/CAD does), but
+    # it's still declared a member of the network's pair universe -- and
+    # still gets its own CurrencyPair node -- via the 'pairs' column.
+    assert (_pair_uri('GBP/USD'), RDF.type, FXPCN.CurrencyPair) in graph
+
+
+def test_activity_links_to_its_network():
+    edges = pd.DataFrame([_edges_row()])
+
+    graph = build_graph(edges)
+
+    activity = next(graph.subjects(RDF.type, PROV.Activity))
+    assert (activity, FXPCN.network, _network_uri('forex-network-seven-majors')) in graph
+    assert (activity, FXPCN.networkName, Literal('forex-network-seven-majors')) in graph
+
+
+def test_slugify_collapses_non_alphanumerics():
+    assert _slugify('forex network / european majors') == 'forex-network-european-majors'
 
 
 def test_density_and_flips_uris_differ_across_regimes_for_same_date():
@@ -286,6 +348,7 @@ def test_build_summary_graph_links_to_same_activity_as_numeric_export():
         _RUN_PARAMS['max_lag'],
         _RUN_PARAMS['fdr_alpha'],
         _RUN_PARAMS['granularity'],
+        _RUN_PARAMS['network_name'],
     )
     bullets = pd.DataFrame([_bullets_row()])
 

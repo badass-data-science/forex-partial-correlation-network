@@ -21,6 +21,7 @@ from fx_pcn import direction_flips as direction_flips_mod
 from fx_pcn import render_graph
 from fx_pcn import summary as summary_mod
 from fx_pcn.incremental import merge_incremental
+from fx_pcn.network import pairs_from_edges
 
 # Reuses render_graph's palette so the matplotlib plots read as the same visual
 # system as the network graph rather than introducing a second color scheme.
@@ -111,7 +112,7 @@ def _d3_graph_data(edges: pd.DataFrame) -> str:
     Escaping <, >, & as \\uXXXX (same approach as strategic-report-generator's
     renderer.py:_build_article_jsonld) keeps the JSON semantically identical
     while making a </script> breakout impossible -- defense in depth, since
-    the 7 major pairs never actually contain those characters."""
+    FX pair names never actually contain those characters."""
     latest = render_graph._latest_edges(edges)
     node_ids = sorted(set(latest['pair_i']) | set(latest['pair_j']))
 
@@ -225,6 +226,7 @@ def generate_report(
     other on any given run."""
     report_date = density['date'].max()
     params = summary_mod.run_params(edges)
+    pairs = pairs_from_edges(edges)
     recent_density_rows = summary_mod.recent_density_rows(density)
     recent_flip_rows = summary_mod.recent_flip_rows(flips)
 
@@ -248,6 +250,7 @@ def generate_report(
         report_date=report_date,
         updated=datetime.datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S %Z'),
         params=params,
+        pairs=pairs,
         d3_js=_d3_bundle(),
         d3_graph_data=_d3_graph_data(edges),
         latest_edge_rows=_latest_edge_rows(edges),
@@ -283,7 +286,7 @@ def run(
     flips = (
         pd.read_parquet(flips_path)
         if flips_path is not None
-        else direction_flips_mod.find_direction_flips(edges)
+        else direction_flips_mod.find_direction_flips(edges, pairs=pairs_from_edges(edges))
     )
 
     generate_report(

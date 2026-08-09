@@ -7,23 +7,38 @@ Guidance for AI coding agents working in this repository.
 `fx-pcn` builds a time-varying partial-correlation network (an undirected
 Gaussian graphical model, not a Bayesian network -- see the "Not actually a
 Bayesian network" note in README.md if that distinction matters to you) with
-Granger-causal edge direction, over the 7 major FX pairs (`EUR/USD`,
-`GBP/USD`, `USD/JPY`, `USD/CHF`, `USD/CAD`, `AUD/USD`, `NZD/USD`). For each
-rolling window of H1 bars it:
+Granger-causal edge direction, over a configurable set of FX pairs -- by
+default the 7 major pairs (`EUR/USD`, `GBP/USD`, `USD/JPY`, `USD/CHF`,
+`USD/CAD`, `AUD/USD`, `NZD/USD`), named `forex-network-seven-majors`
+(`config.DEFAULT_NETWORK_NAME`). `run-pipeline --pairs ... --network-name
+...` builds a differently-scoped network instead -- `--network-name` is
+**required** whenever `--pairs` is given, so a custom pair set is never
+allowed through unnamed (see README's "Custom pair sets"). Every downstream
+command reads a network's identity (`network_name`, and the ordered `pairs`
+list) back out of the edge table's own columns -- only `run-pipeline` itself
+takes `--pairs`/`--network-name`. For each rolling window of H1 bars it:
 
 1. Fetches wide-form price data from InfluxDB (`src/fx_pcn/influx_client.py`, `data.py`).
 2. Computes log returns, masking any return that spans a forward-filled bar (`returns.py`).
 3. Fits an undirected partial-correlation skeleton via graphical lasso (`network.fit_skeleton`).
 4. Orients each skeleton edge with pairwise Granger causality, BH-FDR corrected
    across the window's tests (`network.infer_direction`).
-5. Writes one row per `(date, pair_i, pair_j)` edge to a parquet file (`pipeline.py`).
+5. Writes one row per `(date, pair_i, pair_j)` edge -- plus `network_name`/`pairs`
+   -- to a parquet file (`pipeline.py`; `network.pairs_from_edges` recovers
+   the ordered pair list back out for `density.py`/`direction_flips.py`).
 6. Optionally renders the most recent date's graph as a PNG via Graphviz (`render_graph.py`).
 7. Optionally exports the edge table (plus density/direction-flips) as RDF/Turtle
    (`rdf_export.py`) -- output only, nothing here loads it into a triple store.
    `EdgeObservation`/`NetworkSnapshot`/`DirectionFlip` URIs fold in a regime
-   slug (not just reachable via `prov:wasGeneratedBy`), since multiple
-   regimes' `.ttl` files get loaded into the same Neo4j graph via n10s and
-   would otherwise collide on its unique-URI constraint. Includes a static
+   slug that now also includes the (slugified) `network_name` (not just
+   reachable via `prov:wasGeneratedBy`), since multiple regimes' -- and,
+   since `--pairs`/`--network-name`, differently-scoped networks' -- `.ttl`
+   files get loaded into the same Neo4j graph via n10s and would otherwise
+   collide on its unique-URI constraint. A new `fxpcn:Network` node per
+   distinct `network_name` (`fxpcn:hasPair` per pair in that network,
+   linked from its `prov:Activity` via `fxpcn:network`) lets a consumer
+   resolve which pairs a given regime's Activity was actually built from.
+   Includes a static
    currency -> region/institution vocabulary layer
    (`macro_vocabulary.py`; shared RDF namespace constants in `ontology.py`,
    split out to avoid a circular import between the two) designed to be
@@ -102,6 +117,8 @@ ruff format .                                           # format (single quotes,
 mypy                                                     # type-check src/fx_pcn
 fx-pcn run-pipeline --output output/edges.parquet        # full pipeline, full history since 2015
 fx-pcn run-pipeline --output output/edges.parquet --days 30   # quick smoke test, last 30 days only
+fx-pcn run-pipeline --output output/edges-eu.parquet --pairs EUR/USD USD/CHF GBP/USD \
+  --network-name forex-network-european-majors             # custom pair set, name required
 fx-pcn render-graph --input output/edges.parquet --output output/graph.png   # PNG of the most recent graph
 ```
 
@@ -123,6 +140,14 @@ and will fail otherwise.
 - New pipeline stages should stay pure/testable: take DataFrames in, return
   DataFrames out, with I/O (InfluxDB, parquet) isolated at the edges
   (`influx_client.py`, `pipeline.py`) the way `network.py` and `returns.py` already are.
+- An edge table always describes exactly one network (one `network_name`,
+  one `pairs` list) -- every downstream function (`density.compute_density_table`,
+  `direction_flips.find_direction_flips` via `run()`, `rdf_export`'s
+  `_single_regime_params`) assumes this and raises/errors on a table that
+  mixes more than one. Don't add a code path that appends rows for a
+  different `network_name` into an existing edge table (`pipeline.run`
+  already guards `--append` against this) -- use a separate `--output` path
+  per network instead.
 
 ## Tests
 

@@ -23,6 +23,7 @@ def _run_pipeline(args: argparse.Namespace) -> None:
 
     edges = run_pipeline(
         output_path=args.output,
+        pairs=args.pairs or config.PAIRS,
         start=start,
         window_days=args.window_days,
         step_days=args.step_days,
@@ -30,6 +31,7 @@ def _run_pipeline(args: argparse.Namespace) -> None:
         max_lag=args.max_lag,
         fdr_alpha=args.fdr_alpha,
         granularity=args.granularity,
+        network_name=args.network_name or config.DEFAULT_NETWORK_NAME,
         append=args.append,
     )
     print(edges.tail(20))
@@ -97,6 +99,25 @@ def _add_run_pipeline_parser(subparsers: argparse._SubParsersAction) -> None:
     )
     parser.add_argument(
         '--output', type=Path, required=True, help='Output path for the edge table (parquet)'
+    )
+    parser.add_argument(
+        '--pairs',
+        type=str,
+        nargs='+',
+        default=None,
+        metavar='PAIR',
+        help='Currency pairs to build the network from, e.g. --pairs EUR/USD USD/CHF GBP/USD '
+        f'(default: the {len(config.PAIRS)} major pairs, {", ".join(config.PAIRS)}). Requires '
+        '--network-name whenever given, so the resulting network stays distinguishable from '
+        'other pair sets in the output tables and RDF export.',
+    )
+    parser.add_argument(
+        '--network-name',
+        type=str,
+        default=None,
+        help='Name for the resulting network, e.g. forex-network-european-majors -- recorded on '
+        f'every output row and folded into RDF URIs (default: {config.DEFAULT_NETWORK_NAME!r}). '
+        'Required whenever --pairs is given.',
     )
     parser.add_argument(
         '--days',
@@ -347,7 +368,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    args = build_parser().parse_args()
+    parser = build_parser()
+    args = parser.parse_args()
+    if getattr(args, 'pairs', None) is not None and args.network_name is None:
+        parser.error('--network-name is required whenever --pairs is given')
     args.handler(args)
 
 

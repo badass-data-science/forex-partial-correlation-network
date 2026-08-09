@@ -162,18 +162,28 @@ def build_edge_table(
     max_lag: int = config.MAX_LAG,
     fdr_alpha: float = config.FDR_ALPHA,
     granularity: str = config.GRANULARITY,
+    network_name: str = config.DEFAULT_NETWORK_NAME,
 ) -> pd.DataFrame:
     """The full time-varying network: one row per (date, pair_i, pair_j) edge.
 
     Filtering to a single `date` gives that day's individual graph -- nodes are
-    the 7 pairs, edges are the rows for that date.
+    `returns_df`'s pairs, edges are the rows for that date.
 
     Every row also carries the window/step/lag/alpha/granularity settings it
     was built with, so edge tables from runs with different settings remain
     distinguishable (and filterable) even if later concatenated together.
     `granularity` isn't used by the fitting logic here -- it's threaded through
     purely to be recorded alongside the parameters that are.
+
+    Every row also carries `network_name` (an operator-chosen label for the
+    pair set `returns_df` was built from -- see config.DEFAULT_NETWORK_NAME)
+    and `pairs` (that pair set itself, comma-joined in `returns_df.columns`'s
+    order) -- see `pairs_from_edges` below, which recovers the latter for
+    downstream consumers (density.py, direction_flips.py, rdf_export.py) that
+    need the exact pair universe a given edge table was built over, not just
+    whichever pairs happened to survive the lasso penalty on some date.
     """
+    pairs_csv = ','.join(returns_df.columns)
     rows: list[dict] = []
     for date, window in rolling_windows(returns_df, window_days, step_days, min_observations):
         skeleton = fit_skeleton(window)
@@ -185,6 +195,8 @@ def build_edge_table(
             record['max_lag'] = max_lag
             record['fdr_alpha'] = fdr_alpha
             record['granularity'] = granularity
+            record['network_name'] = network_name
+            record['pairs'] = pairs_csv
             rows.append(record)
 
     columns = [
@@ -201,5 +213,32 @@ def build_edge_table(
         'max_lag',
         'fdr_alpha',
         'granularity',
+        'network_name',
+        'pairs',
     ]
     return pd.DataFrame(rows, columns=columns)
+
+
+def pairs_from_edges(edges: pd.DataFrame) -> list[str]:
+    """The ordered pair list `build_edge_table` was run with, recovered from
+    its `pairs` column -- every row of a single edge table shares the same
+    value (see `build_edge_table`), so any row's suffices. Needed downstream
+    (density.py's max-possible-edges denominator, direction_flips.py's
+    complete no_edge grid) because the pair universe a table was built over
+    isn't fully recoverable from `pair_i`/`pair_j` alone: a pair the lasso
+    penalty zeroed out on every single date never appears in either column.
+
+    Returns `[]` for an edges table with no rows (nothing to recover, and
+    every caller's own per-row computation is a no-op on zero rows anyway).
+    Raises if `edges` spans more than one distinct pair set -- mixing two
+    networks' rows in one table isn't a state any caller here is prepared to
+    handle correctly (see pipeline.run's --append guard, which exists to
+    keep this from happening in the first place).
+    """
+    distinct = edges['pairs'].unique()
+    if len(distinct) > 1:
+        raise ValueError(
+            f'edges spans {len(distinct)} distinct pair sets; pairs_from_edges '
+            'requires a single, unambiguous one'
+        )
+    return distinct[0].split(',') if len(distinct) == 1 else []

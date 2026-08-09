@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from fx_pcn import config
 from fx_pcn.incremental import merge_incremental
+from fx_pcn.network import pairs_from_edges
 
 # Distinct from 'undirected': 'undirected' means the edge existed that window
 # but Granger causality found no significant direction; NO_EDGE means the
@@ -14,7 +14,7 @@ from fx_pcn.incremental import merge_incremental
 NO_EDGE = 'no_edge'
 
 
-def find_direction_flips(edges: pd.DataFrame, pairs: list[str] = config.PAIRS) -> pd.DataFrame:
+def find_direction_flips(edges: pd.DataFrame, pairs: list[str]) -> pd.DataFrame:
     """Every date a given pair's relationship state changed from the date
     before it -- an edge appearing or disappearing entirely (to/from
     NO_EDGE), a direction reversing (`i->j` to `j->i`), gaining or losing a
@@ -22,12 +22,13 @@ def find_direction_flips(edges: pd.DataFrame, pairs: list[str] = config.PAIRS) -
     to be bidirected.
 
     `pairs` must be in the same order `network.build_edge_table` used to
-    generate `pair_i`/`pair_j` (config.PAIRS's declared order, not
-    alphabetical -- `fit_skeleton` orders edges by each pair's position in
-    that list, e.g. ('USD/CAD', 'AUD/USD') because USD/CAD precedes AUD/USD
-    in config.PAIRS, not the reverse). Sorting `pairs` here would silently
-    fail to match rows in `edges` for any pair whose alphabetical order
-    differs from its config.PAIRS order.
+    generate `pair_i`/`pair_j` (i.e. the order its own `pairs` column
+    records -- see network.pairs_from_edges, which `run()` below uses to
+    supply this -- not alphabetical: `fit_skeleton` orders edges by each
+    pair's position in the list `build_edge_table` was run with, e.g.
+    ('USD/CAD', 'AUD/USD') if USD/CAD precedes AUD/USD in that list, not the
+    reverse). Sorting `pairs` here would silently fail to match rows in
+    `edges` for any pair whose alphabetical order differs from that order.
 
     One row per flip: date, pair_i, pair_j, previous_direction, new_direction.
     """
@@ -64,7 +65,7 @@ def run(input_path: Path, output_path: Path, append: bool = False) -> pd.DataFra
     if append and output_path.exists():
         existing = pd.read_parquet(output_path)
 
-    flips = find_direction_flips(edges)
+    flips = find_direction_flips(edges, pairs=pairs_from_edges(edges))
 
     if existing is not None:
         flips = merge_incremental(existing, flips, last_date=existing['date'].max())
