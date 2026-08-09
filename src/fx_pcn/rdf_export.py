@@ -26,8 +26,7 @@ def _pair_uri(pair: str) -> URIRef:
 def _regime_slug(params: tuple) -> str:
     window_days, step_days, min_observations, max_lag, fdr_alpha, granularity = params
     return (
-        f'w{window_days}-s{step_days}-mo{min_observations}'
-        f'-ml{max_lag}-fdr{fdr_alpha}-{granularity}'
+        f'w{window_days}-s{step_days}-mo{min_observations}-ml{max_lag}-fdr{fdr_alpha}-{granularity}'
     )
 
 

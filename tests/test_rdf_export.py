@@ -171,9 +171,7 @@ def test_density_and_flips_uris_differ_across_regimes_for_same_date():
 
 
 def test_build_graph_rejects_ambiguous_multi_regime_density():
-    edges = pd.DataFrame(
-        [_edges_row(), _edges_row(granularity='D', window_days=60, step_days=7)]
-    )
+    edges = pd.DataFrame([_edges_row(), _edges_row(granularity='D', window_days=60, step_days=7)])
     density = pd.DataFrame(
         [
             {
