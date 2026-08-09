@@ -70,28 +70,63 @@
     <dt>Partial correlation</dt>
     <dd>How strongly two pairs move together <em>after</em> netting out the influence of
       the other five — it isolates a direct relationship from one that only shows up
-      because both pairs are being pushed around by some third pair they share.</dd>
+      because both pairs are being pushed around by some third pair they share.
+      <strong>Reading it:</strong> the sign tells you the direction of co-movement — positive
+      means the two pairs tend to move the same way, negative means opposite. The magnitude
+      tells you how strong that link is: values near zero are real but weak (the model kept
+      the edge, but only just), while values approaching the plots' saturation ceiling
+      (|0.6|) are about as strong as this dataset tends to produce. A pair with <em>no</em>
+      edge at all isn't "weak" — the model found no direct link once the other five pairs
+      are accounted for, often because both are only related through a shared driver
+      (commonly a broad dollar move).</dd>
 
     <dt>Granger causality</dt>
     <dd>A test for whether one pair's past values help predict another pair's future
       values, beyond what that pair's own history already explains. It's used to give
-      each edge a direction — which pair tends to move first.</dd>
+      each edge a direction — which pair tends to move first.
+      <strong>Reading it:</strong> a direction means real statistical evidence of a lead-lag
+      relationship, not just "these move together." Treat a bidirected result (both
+      directions significant) with a little extra skepticism — fast, simultaneous reactions
+      to shared news can produce that pattern even without a genuine two-way feedback loop.
+      And a single day's direction is a noisy read on its own; it's worth checking whether
+      it's held up over the last few days (see "Most recent direction changes" below) rather
+      than trusting one date in isolation.</dd>
 
     <dt>Density</dt>
     <dd>The fraction of all possible pairings among the 7 majors (21 total) that have an
       active edge on a given date — a rough gauge of how broadly interconnected the
-      market is that day.</dd>
+      market is that day.
+      <strong>Reading it:</strong> rising density usually means the majors are becoming more
+      interconnected — often a sign of market stress or a single dominant macro theme (a
+      broad risk-on/risk-off move, a shared dollar driver) crowding out pair-specific
+      behavior. Falling density usually means pairs are behaving more independently — a
+      calmer market, or one where pair-specific news is driving prices instead of a shared
+      theme.</dd>
 
     <dt>Mean absolute partial correlation</dt>
     <dd>The average <em>strength</em> of that date's active edges, as opposed to how many
       there are. Density and this measure can move in opposite directions — e.g. more
-      pairs becoming linked while each individual link gets weaker.</dd>
+      pairs becoming linked while each individual link gets weaker.
+      <strong>Reading it:</strong> a day with many <em>weak</em> edges (high density, low
+      mean |partial corr|) is a different regime from a day with a few <em>very strong</em>
+      ones (low density, high mean |partial corr|) — the first looks like broad, mild
+      co-movement across the majors; the second looks like a small cluster of pairs reacting
+      intensely to the same thing. Read this measurement alongside density, not by itself.</dd>
 
     <dt>Direction</dt>
     <dd>Each edge is labeled <code>i-&gt;j</code> or <code>j-&gt;i</code> (one pair leads
       the other), <code>i&lt;-&gt;j</code> (bidirected — both directions found
       significant), or <code>undirected</code> (the pairs are linked, but no lead-lag
-      relationship was significant either way).</dd>
+      relationship was significant either way).
+      <strong>Reading it:</strong> a change from one state to another (see the direction-changes
+      table below) is worth asking "what changed?" — a new edge often means a new shared
+      driver, a lost edge often means one pair had idiosyncratic news that broke the prior
+      co-movement, and swapped leadership (<code>i-&gt;j</code> to <code>j-&gt;i</code>) is
+      worth checking against which currency's news calendar was actually active that day. The
+      single biggest caveat: a lone, one-day flip is more likely statistical noise than a real
+      regime change — Granger tests sitting near the FDR significance boundary can flicker in
+      and out from one window to the next just from sampling noise. Trust a flip once it
+      persists across a few consecutive dates, not the moment it first appears.</dd>
   </dl>
   <p>For more on the project behind this report, read the blog post
     <a href="https://badassdatascience.substack.com/p/our-heroine-wiretaps-seven-currency"
