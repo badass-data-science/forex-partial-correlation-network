@@ -1,0 +1,381 @@
+{% extends "base.html.j2" %}
+
+{% block head %}
+<title>FX Partial-Correlation Network Report — {{ report_date }}</title>
+<style>
+  .front-matter {
+    background: #f0f4ff;
+    border-left: 4px solid #2a78d6;
+    border-radius: 4px;
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0 2rem;
+  }
+  .front-matter h2 { margin-top: 0; font-size: 1.1rem; color: #17439c; }
+  .params { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin: .5rem 0 0; padding: 0; list-style: none; }
+  .params li { font-size: .9rem; }
+  .params .label { color: #6f6e6a; margin-right: .3rem; }
+  .plot-pair { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+  .plot-pair figure { flex: 1 1 260px; }
+  .summary { background: #f9f9f9; border: 1px solid #e8e8e8; border-radius: 4px; padding: 1rem 1.25rem; }
+  .about { background: #f9f9f9; border: 1px solid #e8e8e8; border-radius: 4px; padding: 1rem 1.25rem; }
+  .about h2 { margin-top: 0; font-size: 1.1rem; color: #111; }
+  .about dl { margin: .75rem 0 0; }
+  .about dt { font-weight: 600; color: #111; }
+  .about dd { margin: 0 0 .6rem; color: #333; }
+  .toc { background: #f9f9f9; border: 1px solid #e8e8e8; border-radius: 4px;
+         padding: 1rem 1.25rem; margin: 1.5rem 0 2rem; }
+  .toc h2 { margin-top: 0; font-size: 1.1rem; color: #111; }
+  .toc ul { margin: .4rem 0 0; }
+</style>
+{% endblock %}
+
+{% block body %}
+<h1>FX Partial-Correlation Network Report</h1>
+<p class="meta">Generated: {{ updated }}</p>
+
+<div class="front-matter">
+  <h2>Report date: {{ report_date }}</h2>
+  <p class="meta">Data reflects the most recent date present in the source tables.</p>
+  <ul class="params">
+    <li><span class="label">Window days:</span>{{ params.window_days }}</li>
+    <li><span class="label">Step days:</span>{{ params.step_days }}</li>
+    <li><span class="label">Min observations:</span>{{ params.min_observations }}</li>
+    <li><span class="label">Max lag:</span>{{ params.max_lag }}</li>
+    <li><span class="label">FDR alpha:</span>{{ params.fdr_alpha }}</li>
+    <li><span class="label">Granularity:</span>{{ params.granularity }}</li>
+  </ul>
+</div>
+
+<nav class="toc">
+  <h2>Table of Contents</h2>
+  <ul>
+    <li><a href="#about">About this report</a></li>
+    <li><a href="#network-graph">Network graph</a></li>
+    <li><a href="#recent-data">Most recent density data</a></li>
+    <li><a href="#recent-direction-changes">Most recent direction changes</a></li>
+    <li><a href="#distributions">Distributions — full history</a></li>
+    <li><a href="#trends">Trends — last year</a></li>
+    <li><a href="#summary">Qualitative summary</a></li>
+  </ul>
+</nav>
+
+<div class="about" id="about">
+  <h2>About this report</h2>
+  <p>This report tracks a statistical network built from the returns of the 7 major FX
+    pairs. For each date, every pair of currencies is checked for a direct relationship
+    with every other pair — the result is a graph where nodes are currency pairs and
+    edges are the relationships that date's data actually supports. The measurements
+    below are what the rest of this report is built from:</p>
+  <dl>
+    <dt>Partial correlation</dt>
+    <dd>How strongly two pairs move together <em>after</em> netting out the influence of
+      the other five — it isolates a direct relationship from one that only shows up
+      because both pairs are being pushed around by some third pair they share.</dd>
+
+    <dt>Granger causality</dt>
+    <dd>A test for whether one pair's past values help predict another pair's future
+      values, beyond what that pair's own history already explains. It's used to give
+      each edge a direction — which pair tends to move first.</dd>
+
+    <dt>Density</dt>
+    <dd>The fraction of all possible pairings among the 7 majors (21 total) that have an
+      active edge on a given date — a rough gauge of how broadly interconnected the
+      market is that day.</dd>
+
+    <dt>Mean absolute partial correlation</dt>
+    <dd>The average <em>strength</em> of that date's active edges, as opposed to how many
+      there are. Density and this measure can move in opposite directions — e.g. more
+      pairs becoming linked while each individual link gets weaker.</dd>
+
+    <dt>Direction</dt>
+    <dd>Each edge is labeled <code>i-&gt;j</code> or <code>j-&gt;i</code> (one pair leads
+      the other), <code>i&lt;-&gt;j</code> (bidirected — both directions found
+      significant), or <code>undirected</code> (the pairs are linked, but no lead-lag
+      relationship was significant either way).</dd>
+  </dl>
+  <p>For more on the project behind this report, read the blog post
+    <a href="https://badassdatascience.substack.com/p/our-heroine-wiretaps-seven-currency"
+       target="_blank" rel="noopener">Our Heroine Wiretaps Seven Currency Pairs</a>; the
+    source code that produced it is on
+    <a href="https://github.com/badass-data-science/forex-partial-correlation-network"
+       target="_blank" rel="noopener">GitHub</a>.</p>
+</div>
+
+<section id="network-graph">
+  <h2>Network graph — {{ report_date }}</h2>
+  <div id="d3-graph"></div>
+  <p class="meta">Blue = positive, red = negative partial correlation; width scales with
+    |partial correlation|; arrows mark Granger-significant direction. Drag a node to rearrange it.</p>
+  <script>{{ d3_js | safe }}</script>
+  <script>
+  (function () {
+    var graph = {{ d3_graph_data | safe }};
+    // width/height are just working room for the simulation to settle in --
+    // generous on purpose so forceLink.distance()/forceManyBody.strength()
+    // (below) have space to push nodes apart. The *displayed* canvas is fit
+    // tightly to wherever the nodes actually end up (see the 'end' handler),
+    // so there's no leftover empty margin baked into a fixed box size, and
+    // nodes render at whatever size that tight fit implies -- typically
+    // larger than they would in an oversized fixed canvas, not smaller.
+    var width = 980, height = 820, nodeRadius = 34;
+    var posColor = [42, 120, 214], negColor = [227, 73, 72], midColor = [185, 184, 178];
+    var saturationCeiling = 0.6;
+
+    function mixColor(pcorr) {
+      var t = Math.min(Math.abs(pcorr) / saturationCeiling, 1);
+      var pole = pcorr >= 0 ? posColor : negColor;
+      var rgb = midColor.map(function (m, i) { return Math.round(m + (pole[i] - m) * t); });
+      return 'rgb(' + rgb.join(',') + ')';
+    }
+    function edgeWidth(pcorr) {
+      return 1.4 + Math.min(Math.abs(pcorr) / saturationCeiling, 1) * 4.6;
+    }
+    function pointNear(from, to, r) {
+      var dx = to.x - from.x, dy = to.y - from.y;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      return { x: to.x - (dx / len) * r, y: to.y - (dy / len) * r };
+    }
+
+    var svg = d3.select('#d3-graph').append('svg')
+        .attr('viewBox', '0 0 ' + width + ' ' + height)
+        .attr('width', '100%')
+        .attr('height', height)
+        .style('background', '#fcfcfb')
+        .style('border', '1px solid #e8e8e8')
+        .style('border-radius', '4px');
+
+    var defs = svg.append('defs');
+    graph.links.forEach(function (d, i) {
+      defs.append('marker')
+          .attr('id', 'd3-arrow-' + i)
+          .attr('viewBox', '0 -5 10 10')
+          .attr('refX', 9)
+          .attr('markerWidth', 6)
+          .attr('markerHeight', 6)
+          .attr('orient', 'auto-start-reverse')
+        .append('path')
+          .attr('d', 'M0,-5L10,0L0,5')
+          .attr('fill', mixColor(d.partial_corr));
+    });
+
+    var simulation = d3.forceSimulation(graph.nodes)
+        .force('link', d3.forceLink(graph.links).id(function (d) { return d.id; })
+          .distance(340).strength(0.4))
+        .force('charge', d3.forceManyBody().strength(-950))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collide', d3.forceCollide(nodeRadius + 6));
+
+    var link = svg.append('g').selectAll('line')
+        .data(graph.links)
+        .join('line')
+          .attr('stroke', function (d) { return mixColor(d.partial_corr); })
+          .attr('stroke-width', function (d) { return edgeWidth(d.partial_corr); })
+          .attr('marker-end', function (d, i) {
+            return (d.arrow === 'forward' || d.arrow === 'both') ? 'url(#d3-arrow-' + i + ')' : null;
+          })
+          .attr('marker-start', function (d, i) {
+            return d.arrow === 'both' ? 'url(#d3-arrow-' + i + ')' : null;
+          });
+
+    var linkLabel = svg.append('g').selectAll('text')
+        .data(graph.links.filter(function (d) { return d.label; }))
+        .join('text')
+          .attr('font-size', 10)
+          .attr('font-family', 'Helvetica, Arial, sans-serif')
+          .attr('fill', '#0b0b0b')
+          .attr('text-anchor', 'middle')
+          .text(function (d) { return (d.partial_corr >= 0 ? '+' : '') + d.partial_corr.toFixed(2); });
+
+    var node = svg.append('g').selectAll('g')
+        .data(graph.nodes)
+        .join('g')
+          .call(d3.drag()
+            .on('start', function (event, d) {
+              if (!event.active) simulation.alphaTarget(0.3).restart();
+              d.fx = d.x; d.fy = d.y;
+            })
+            .on('drag', function (event, d) { d.fx = event.x; d.fy = event.y; })
+            .on('end', function (event, d) {
+              if (!event.active) simulation.alphaTarget(0);
+              d.fx = null; d.fy = null;
+            }));
+
+    node.append('circle')
+        .attr('r', nodeRadius)
+        .attr('fill', '#fcfcfb')
+        .attr('stroke', '#0b0b0b')
+        .attr('stroke-width', 1.2);
+
+    node.append('text')
+        .text(function (d) { return d.id; })
+        .attr('text-anchor', 'middle')
+        .attr('dy', '0.32em')
+        .attr('font-size', 11)
+        .attr('font-family', 'Helvetica, Arial, sans-serif')
+        .attr('fill', '#0b0b0b');
+
+    simulation.on('tick', function () {
+      link.each(function (d) {
+        var start = pointNear(d.target, d.source, nodeRadius);
+        var end = pointNear(d.source, d.target, nodeRadius);
+        d3.select(this).attr('x1', start.x).attr('y1', start.y).attr('x2', end.x).attr('y2', end.y);
+      });
+      linkLabel
+          .attr('x', function (d) { return (d.source.x + d.target.x) / 2; })
+          .attr('y', function (d) { return (d.source.y + d.target.y) / 2; });
+      node.attr('transform', function (d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+    });
+
+    // Once the simulation settles, crop the viewBox tightly to wherever the
+    // nodes actually landed (plus a margin for their radius/labels) instead
+    // of leaving the full working width x height visible -- removes the dead
+    // space around a compact layout without rescaling node/text sizes
+    // relative to it, so the graph reads bigger, not smaller.
+    simulation.on('end', function () {
+      var margin = nodeRadius + 30;
+      var xs = graph.nodes.map(function (d) { return d.x; });
+      var ys = graph.nodes.map(function (d) { return d.y; });
+      var minX = Math.min.apply(null, xs) - margin;
+      var maxX = Math.max.apply(null, xs) + margin;
+      var minY = Math.min.apply(null, ys) - margin;
+      var maxY = Math.max.apply(null, ys) + margin;
+      var boxWidth = maxX - minX;
+      var boxHeight = maxY - minY;
+      var renderedWidth = svg.node().getBoundingClientRect().width || width;
+
+      svg.attr('viewBox', minX + ' ' + minY + ' ' + boxWidth + ' ' + boxHeight)
+          .attr('height', Math.round(renderedWidth * boxHeight / boxWidth));
+    });
+  })();
+  </script>
+
+  <h3>All edges — {{ report_date }}</h3>
+  {% if latest_edge_rows %}
+  <table>
+    <thead>
+      <tr>
+        <th>Pair i</th>
+        <th>Pair j</th>
+        <th>Partial corr</th>
+        <th>Direction</th>
+        <th>Granger p (i&rarr;j)</th>
+        <th>Granger p (j&rarr;i)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in latest_edge_rows %}
+      <tr>
+        <td>{{ row.pair_i }}</td>
+        <td>{{ row.pair_j }}</td>
+        <td>{{ '%+.4f' | format(row.partial_corr) }}</td>
+        <td>{{ row.direction | replace('_', ' ') }}</td>
+        <td>{{ '%.4f' | format(row.granger_p_i_to_j) }}</td>
+        <td>{{ '%.4f' | format(row.granger_p_j_to_i) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="no-data">No edges survived the lasso penalty on {{ report_date }}.</p>
+  {% endif %}
+</section>
+
+<section id="recent-data">
+  <h2>Most recent density data</h2>
+  {% if recent_density_rows %}
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Edge count</th>
+        <th>Density</th>
+        <th>Mean |partial corr|</th>
+        <th>Directed</th>
+        <th>Bidirected</th>
+        <th>Undirected</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in recent_density_rows %}
+      <tr>
+        <td>{{ row.date }}</td>
+        <td>{{ row.edge_count }}</td>
+        <td>{{ '%.4f' | format(row.density) }}</td>
+        <td>{{ '%.4f' | format(row.mean_abs_partial_corr) }}</td>
+        <td>{{ row.directed_edge_count }}</td>
+        <td>{{ row.bidirected_edge_count }}</td>
+        <td>{{ row.undirected_edge_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="no-data">No density data available.</p>
+  {% endif %}
+</section>
+
+<section id="recent-direction-changes">
+  <h2>Most recent direction changes</h2>
+  {% if recent_flip_rows %}
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Pair i</th>
+        <th>Pair j</th>
+        <th>Previous direction</th>
+        <th>New direction</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in recent_flip_rows %}
+      <tr>
+        <td>{{ row.date }}</td>
+        <td>{{ row.pair_i }}</td>
+        <td>{{ row.pair_j }}</td>
+        <td>{{ row.previous_direction | replace('_', ' ') }}</td>
+        <td>{{ row.new_direction | replace('_', ' ') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="no-data">No direction changes recorded.</p>
+  {% endif %}
+</section>
+
+<section id="distributions">
+  <h2>Distributions — full history</h2>
+  <figure>
+    <img src="{{ boxplot_data_uri }}" alt="Boxplots of density and mean |partial correlation| across the full time series">
+    <figcaption>Density and mean |partial correlation|, across every date in the source data.</figcaption>
+  </figure>
+</section>
+
+<section id="trends">
+  <h2>Trends — last year</h2>
+  <figure>
+    <img src="{{ timeseries_data_uri }}" alt="Time series of density and mean |partial correlation| over the last year">
+    <figcaption>Density and mean |partial correlation|, trailing 365 days from {{ report_date }}.</figcaption>
+  </figure>
+</section>
+
+<section id="summary">
+  <h2>Qualitative summary</h2>
+  {% if llm_summary %}
+  <p class="warn">The following summary was generated by an LLM using the tables and
+    statistics above. Unlike the rest of this report, this section is not a direct
+    readout of the data. Please apply judgement before acting on this interpretation.
+    <strong>Caveat emptor!</strong></p>
+  <div class="summary">
+    {% for paragraph in llm_summary.split('\n\n') %}
+    <p>{{ paragraph }}</p>
+    {% endfor %}
+  </div>
+  {% elif llm_summary_enabled %}
+  <p class="no-data">LLM summary unavailable (the call failed or returned no content) — see logs.</p>
+  {% else %}
+  <p class="no-data">LLM summary skipped (--no-llm-summary).</p>
+  {% endif %}
+</section>
+{% endblock %}

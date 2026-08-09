@@ -69,6 +69,21 @@ export INFLUXDB_BUCKET=...
 No credentials are needed just to run the test suite (`pytest`) — it exercises
 the statistics on synthetic data and never touches InfluxDB.
 
+`generate-report` (below) additionally makes an LLM call for its qualitative
+summary, via [litellm](https://docs.litellm.ai/) — same setup as the sibling
+[`strategic-report-generator`](https://github.com/badass-data-science/strategic-report-generator)
+project:
+
+```
+LLM_MODEL        # litellm model string, e.g. ollama_chat/glm-5.2:cloud or anthropic/claude-sonnet-4-6
+                  # (default: ollama_chat/glm-5.2:cloud)
+OLLAMA_API_BASE   # only needed for Ollama-backed models
+OLLAMA_API_KEY    # only needed for authenticated/hosted Ollama instances
+```
+
+Pass `--no-llm-summary` to skip this step entirely (no network call, no env
+vars needed).
+
 ## Running it
 
 Everything goes through the `fx-pcn` command (or `python -m fx_pcn.cli`):
@@ -88,6 +103,9 @@ fx-pcn render-graph --input output/edges.parquet --output output/graph.png
 
 # Export the edge table (and optionally density/direction-flips) as RDF/Turtle
 fx-pcn export-rdf --edges output/edges.parquet --output output/graph.ttl
+
+# Render a self-contained HTML report (graph, plots, tables, LLM summary)
+fx-pcn generate-report --edges output/edges.parquet --output output/report.html
 ```
 
 `run-pipeline` options (all optional except `--output`):
@@ -458,8 +476,8 @@ date in the series can't flip, since there's nothing before it to compare to.
 Both commands are pure functions of the edge table (`fx_pcn.density.compute_density_table`,
 `fx_pcn.direction_flips.find_direction_flips`) wrapped in a thin file-reading/writing
 `run()` — no InfluxDB access, so they're fast and fully covered by synthetic-data
-tests. A planned next step is a daily report synthesizing both of these into a
-single human-readable summary; not built yet.
+tests. `generate-report` (below) synthesizes both of these, plus the graph itself,
+into a single human-readable report.
 
 ### RDF export
 
@@ -509,6 +527,53 @@ and that date's individual `EdgeObservation`s either — the shared `fxpcn:date`
 literal is enough for a consumer to join across them, and it keeps each
 table's export as independent as the pure functions that produced the tables
 themselves.
+
+### HTML report
+
+`generate-report` renders one self-contained HTML file — no sidecar images or
+scripts, everything inlined — combining the graph, both derived tables,
+distribution/trend plots, and an LLM-written interpretation:
+
+```bash
+fx-pcn generate-report --edges output/edges.parquet --output output/report.html
+
+# Reuse precomputed density/direction-flips tables instead of recomputing them:
+fx-pcn generate-report \
+  --edges output/edges.parquet \
+  --density output/density.parquet \
+  --flips output/flips.parquet \
+  --output output/report.html \
+  --model anthropic/claude-sonnet-4-6
+```
+
+Only `--edges` and `--output` are required, following the same optionality as
+`export-rdf`: `--density`/`--flips` are computed in memory from `--edges`
+(via the same `compute_density_table`/`find_direction_flips` functions
+above) if not given. `--model` overrides `LLM_MODEL` for just this run;
+`--no-llm-summary` skips the LLM step (see [Configuration](#configuration)
+for the env vars it reads).
+
+The report contains, in order:
+
+| Section | Content |
+|---|---|
+| Front matter | The date the report is relevant to (the source data's most recent date) and the `(window_days, step_days, min_observations, max_lag, fdr_alpha, granularity)` regime that produced it |
+| Network graph | The most recent date's graph, rendered client-side as an interactive D3 force-directed layout (draggable nodes; same color/width/arrow encoding as `render-graph`'s Graphviz output) — plus an "All edges" table underneath with every edge for that date (pair_i, pair_j, partial corr, direction, both Granger p-values), including ones below the graph's own label threshold |
+| Most recent density data | The last 5 `compute-density` rows, sorted ascending by date: date, edge count, density, mean \|partial corr\|, directed/bidirected/undirected counts |
+| Most recent direction changes | The last 10 `find-direction-flips` rows, sorted ascending by date then pair_i/pair_j: date, pair_i, pair_j, previous/new direction |
+| Distributions | Boxplots of density and mean \|partial corr\| across the full history (date range in the plot title), each marked with that metric's most recent value |
+| Trends | Time series of density and mean \|partial corr\| over the trailing year, each marked with that metric's most recent value |
+| Qualitative summary | An LLM-written interpretation of the above (or a note that it was skipped/unavailable) |
+
+Templating follows the same strategy as `strategic-report-generator`: Jinja2
+with `autoescape=True` and a `base.html.j2`/`report.html.j2` split
+(`src/fx_pcn/templates/`), so `{{ }}`-interpolated values are always
+HTML-escaped. The plots reuse `render_graph.py`'s existing color palette
+rather than a separate one, so the matplotlib figures and the D3 graph read
+as the same visual system. D3 v7 is vendored inline
+(`src/fx_pcn/templates/vendor/d3.v7.min.js`) rather than loaded from a CDN, so
+the report still renders offline as a single file — no network access needed
+to view it, only to generate its LLM summary.
 
 ### The currency → region/institution vocabulary layer
 
@@ -655,6 +720,8 @@ src/fx_pcn/
   density.py              Per-date network-density summary (compute-density)
   direction_flips.py       Detects edge-direction changes date over date (find-direction-flips)
   incremental.py           Shared "append only new dates" merge helper
+  report.py                Self-contained HTML report: graph, plots, tables, LLM summary (generate-report)
+  templates/                Jinja2 templates for the HTML report (base.html.j2, report.html.j2)
 tests/                    Statistical logic tested on synthetic, ground-truth data
 ```
 
