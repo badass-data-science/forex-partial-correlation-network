@@ -39,19 +39,21 @@
 
 <section id="network-graph">
   <h2>Network graph — {{ report_date }}</h2>
-  <figure>
-    <img src="{{ network_graph_data_uri }}" alt="FX partial-correlation network graph for {{ report_date }}">
-  </figure>
-
-  <h3>D3 force-directed version (experimental) — {{ report_date }}</h3>
-  <p class="meta">Same edges as the graph above, laid out with a D3 force simulation instead
-    of Graphviz — for visual comparison. Drag a node to rearrange it.</p>
   <div id="d3-graph"></div>
+  <p class="meta">Blue = positive, red = negative partial correlation; width scales with
+    |partial correlation|; arrows mark Granger-significant direction. Drag a node to rearrange it.</p>
   <script>{{ d3_js | safe }}</script>
   <script>
   (function () {
     var graph = {{ d3_graph_data | safe }};
-    var width = 760, height = 620, nodeRadius = 34;
+    // width/height are just working room for the simulation to settle in --
+    // generous on purpose so forceLink.distance()/forceManyBody.strength()
+    // (below) have space to push nodes apart. The *displayed* canvas is fit
+    // tightly to wherever the nodes actually end up (see the 'end' handler),
+    // so there's no leftover empty margin baked into a fixed box size, and
+    // nodes render at whatever size that tight fit implies -- typically
+    // larger than they would in an oversized fixed canvas, not smaller.
+    var width = 980, height = 820, nodeRadius = 34;
     var posColor = [42, 120, 214], negColor = [227, 73, 72], midColor = [185, 184, 178];
     var saturationCeiling = 0.6;
 
@@ -94,8 +96,8 @@
 
     var simulation = d3.forceSimulation(graph.nodes)
         .force('link', d3.forceLink(graph.links).id(function (d) { return d.id; })
-          .distance(150).strength(0.6))
-        .force('charge', d3.forceManyBody().strength(-420))
+          .distance(340).strength(0.4))
+        .force('charge', d3.forceManyBody().strength(-950))
         .force('center', d3.forceCenter(width / 2, height / 2))
         .force('collide', d3.forceCollide(nodeRadius + 6));
 
@@ -158,6 +160,27 @@
           .attr('x', function (d) { return (d.source.x + d.target.x) / 2; })
           .attr('y', function (d) { return (d.source.y + d.target.y) / 2; });
       node.attr('transform', function (d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+    });
+
+    // Once the simulation settles, crop the viewBox tightly to wherever the
+    // nodes actually landed (plus a margin for their radius/labels) instead
+    // of leaving the full working width x height visible -- removes the dead
+    // space around a compact layout without rescaling node/text sizes
+    // relative to it, so the graph reads bigger, not smaller.
+    simulation.on('end', function () {
+      var margin = nodeRadius + 30;
+      var xs = graph.nodes.map(function (d) { return d.x; });
+      var ys = graph.nodes.map(function (d) { return d.y; });
+      var minX = Math.min.apply(null, xs) - margin;
+      var maxX = Math.max.apply(null, xs) + margin;
+      var minY = Math.min.apply(null, ys) - margin;
+      var maxY = Math.max.apply(null, ys) + margin;
+      var boxWidth = maxX - minX;
+      var boxHeight = maxY - minY;
+      var renderedWidth = svg.node().getBoundingClientRect().width || width;
+
+      svg.attr('viewBox', minX + ' ' + minY + ' ' + boxWidth + ' ' + boxHeight)
+          .attr('height', Math.round(renderedWidth * boxHeight / boxWidth));
     });
   })();
   </script>

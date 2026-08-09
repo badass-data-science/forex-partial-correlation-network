@@ -115,16 +115,6 @@ def _mark_latest_value(ax: plt.Axes, x: int | datetime.date, y: float) -> None:
         text.set_color(_INK_COLOR)
 
 
-def _network_graph_data_uri(edges: pd.DataFrame) -> str:
-    """Reuses render_graph's existing Graphviz construction, piping straight to
-    in-memory PNG bytes (no temp file) rather than duplicating its layout logic."""
-    latest = render_graph._latest_edges(edges)
-    dot = render_graph.build_graph(latest)
-    png_bytes: bytes = dot.pipe(format='png')
-    encoded = base64.b64encode(png_bytes).decode('ascii')
-    return f'data:image/png;base64,{encoded}'
-
-
 @lru_cache(maxsize=1)
 def _d3_bundle() -> str:
     """Vendored D3 v7 (github.com/d3/d3, ISC license) rather than a CDN
@@ -135,11 +125,11 @@ def _d3_bundle() -> str:
 
 
 def _d3_graph_data(edges: pd.DataFrame) -> str:
-    """EXPERIMENTAL: nodes/links for a D3 force-directed rendering of the same
-    most-recent-date graph render_graph.build_graph draws, so the two can be
-    visually compared. Mirrors render_graph.build_graph's own source/target/
-    arrow-direction logic exactly (see its 'if <-> / elif -> / else' block)
-    rather than reimplementing it differently.
+    """Nodes/links for a D3 force-directed rendering of the most recent date's
+    graph. Mirrors render_graph.build_graph's own source/target/arrow-direction
+    logic exactly (see its 'if <-> / elif -> / else' block) rather than
+    reimplementing it differently, even though build_graph's Graphviz PNG
+    itself is no longer rendered here.
 
     Escaping <, >, & as \\uXXXX (same approach as strategic-report-generator's
     renderer.py:_build_article_jsonld) keeps the JSON semantically identical
@@ -386,7 +376,6 @@ def generate_report(
         report_date=report_date,
         updated=datetime.datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S %Z'),
         params=params,
-        network_graph_data_uri=_network_graph_data_uri(edges),
         d3_js=_d3_bundle(),
         d3_graph_data=_d3_graph_data(edges),
         latest_edge_rows=_latest_edge_rows(edges),

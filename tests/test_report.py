@@ -173,9 +173,12 @@ def test_generate_report_writes_self_contained_html(tmp_path):
     assert 'EUR/USD' in html and 'USD/CAD' in html
     assert 'All edges' in html
     assert 'Most recent density data' in html
-    assert html.count('data:image/png;base64,') == 3  # graph + boxplots + time series
+    # boxplots + time series; D3 replaces the graph PNG
+    assert html.count('data:image/png;base64,') == 2
     assert 'id="d3-graph"' in html
     assert 'd3js.org' in html  # vendored D3 bundle is inlined, not CDN-linked
+    # caption used to be baked into the Graphviz PNG; now it's plain HTML text
+    assert 'Blue = positive, red = negative partial correlation' in html
     assert 'LLM summary skipped' in html
 
 

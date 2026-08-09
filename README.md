@@ -530,9 +530,9 @@ themselves.
 
 ### HTML report
 
-`generate-report` renders one self-contained HTML file — no sidecar images,
-everything embedded as base64 `data:` URIs — combining the graph, both
-derived tables, distribution/trend plots, and an LLM-written interpretation:
+`generate-report` renders one self-contained HTML file — no sidecar images or
+scripts, everything inlined — combining the graph, both derived tables,
+distribution/trend plots, and an LLM-written interpretation:
 
 ```bash
 fx-pcn generate-report --edges output/edges.parquet --output output/report.html
@@ -558,7 +558,7 @@ The report contains, in order:
 | Section | Content |
 |---|---|
 | Front matter | The date the report is relevant to (the source data's most recent date) and the `(window_days, step_days, min_observations, max_lag, fdr_alpha, granularity)` regime that produced it |
-| Network graph | The most recent date's graph — the same rendering `render-graph` produces, piped straight to an embedded PNG rather than a temp file — plus an "All edges" table underneath with every edge for that date (pair_i, pair_j, partial corr, direction, both Granger p-values), including ones below the graph's own label threshold |
+| Network graph | The most recent date's graph, rendered client-side as an interactive D3 force-directed layout (draggable nodes; same color/width/arrow encoding as `render-graph`'s Graphviz output) — plus an "All edges" table underneath with every edge for that date (pair_i, pair_j, partial corr, direction, both Granger p-values), including ones below the graph's own label threshold |
 | Most recent density data | The last 5 `compute-density` rows, sorted ascending by date: date, edge count, density, mean \|partial corr\|, directed/bidirected/undirected counts |
 | Most recent direction changes | The last 10 `find-direction-flips` rows, sorted ascending by date then pair_i/pair_j: date, pair_i, pair_j, previous/new direction |
 | Distributions | Boxplots of density and mean \|partial corr\| across the full history (date range in the plot title), each marked with that metric's most recent value |
@@ -569,8 +569,11 @@ Templating follows the same strategy as `strategic-report-generator`: Jinja2
 with `autoescape=True` and a `base.html.j2`/`report.html.j2` split
 (`src/fx_pcn/templates/`), so `{{ }}`-interpolated values are always
 HTML-escaped. The plots reuse `render_graph.py`'s existing color palette
-rather than a separate one, so the matplotlib figures read as the same
-visual system as the graph image.
+rather than a separate one, so the matplotlib figures and the D3 graph read
+as the same visual system. D3 v7 is vendored inline
+(`src/fx_pcn/templates/vendor/d3.v7.min.js`) rather than loaded from a CDN, so
+the report still renders offline as a single file — no network access needed
+to view it, only to generate its LLM summary.
 
 ### The currency → region/institution vocabulary layer
 
