@@ -190,6 +190,10 @@ def test_generate_report_writes_self_contained_html(tmp_path):
                     'distributions', 'trends', 'summary'):
         assert f'href="#{anchor}"' in html
         assert f'id="{anchor}"' in html
+    blog_url = 'https://badassdatascience.substack.com/p/our-heroine-wiretaps-seven-currency'
+    repo_url = 'https://github.com/badass-data-science/forex-partial-correlation-network'
+    assert f'href="{blog_url}"' in html
+    assert f'href="{repo_url}"' in html
     assert 'LLM summary skipped' in html
 
 
