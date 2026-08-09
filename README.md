@@ -725,6 +725,24 @@ src/fx_pcn/
 tests/                    Statistical logic tested on synthetic, ground-truth data
 ```
 
+## Repository knowledge graph (graphify)
+
+`graphify-out/` holds a [`graphify`](https://pypi.org/project/graphifyy/)-generated
+knowledge graph of this repo itself — entities and relationships extracted from
+both code (AST) and docs (README, AGENTS.md, blog posts) via LLM, with community
+detection surfacing cross-file connections a human wouldn't think to look for:
+
+| File | What it is |
+|---|---|
+| `graph.html` | Interactive graph — open directly in a browser, no server needed |
+| `GRAPH_REPORT.md` | Plain-language audit report: communities, god nodes, surprising connections, suggested questions |
+| `graph.json` | Raw graph data (nodes/edges/communities), queryable via `graphify query "<question>"` |
+
+Everything else `graphify` writes to `graphify-out/` (`cache/`, `manifest.json`,
+`cost.json`, `.graphify_*` interpreter/state files) is gitignored — regenerable
+working state, not meant to be tracked. Regenerate with `graphify .` from the
+repo root (or `/graphify .` in Claude Code).
+
 ## Testing
 
 ```bash

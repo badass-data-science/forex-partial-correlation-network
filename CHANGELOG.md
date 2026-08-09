@@ -7,6 +7,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `graphify-out/graph.html`, `graphify-out/GRAPH_REPORT.md`, and
+  `graphify-out/graph.json`: a `graphify`-generated knowledge graph of this
+  repo itself (entities/relationships from both AST-parsed code and
+  LLM-extracted docs, with community detection), committed for browsing and
+  agent querying. Everything else `graphify` writes to `graphify-out/`
+  (`cache/`, `manifest.json`, `cost.json`, `.graphify_*` interpreter/state
+  files) is gitignored as regenerable working state.
+- `generate-report`: renders a single self-contained HTML report
+  (`fx_pcn.report`) combining the most recent date's network graph -- an
+  interactive D3 v7 force-directed layout, vendored inline rather than a CDN
+  link so the report stays offline-renderable, with the same color/width/arrow
+  encoding as `render-graph`'s Graphviz output -- an "About this report"
+  explainer of the underlying measurements (partial correlation, Granger
+  causality, density, mean |partial corr|, direction), a table of contents,
+  the last 5 `compute-density` rows and last 10 `find-direction-flips` rows
+  (both sorted ascending by date), a full per-edge detail table (every edge
+  for the date, not just ones above the graph's own label threshold),
+  distribution/trend `matplotlib` plots each marked with that metric's most
+  recent value, and an LLM-written qualitative summary with a warning
+  immediately above it (not at the document's end) noting only that section
+  is LLM-generated. Follows `export-rdf`'s `--edges`-required /
+  `--density`+`--flips`-optional flag pattern, and
+  `strategic-report-generator`'s Jinja2 (`autoescape=True`,
+  `base.html.j2`/`report.html.j2` split) templating strategy and
+  `LLM_MODEL`/`OLLAMA_API_BASE`/`OLLAMA_API_KEY` `litellm` env-var setup. New
+  deps: `matplotlib`, `jinja2`, `litellm`.
 - `fx_pcn.flows`: Prefect scheduling for four of the five parameter regimes
   in README's "Other parameter regimes" table (all but event-conditioned),
   running the full artifact chain (`run-pipeline --append` -> `compute-density
