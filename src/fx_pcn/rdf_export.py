@@ -34,17 +34,18 @@ def _activity_uri(params: tuple) -> URIRef:
     return KG[f'run/{_regime_slug(params)}']
 
 
-def _edges_regime_params(edges: pd.DataFrame) -> tuple:
-    """The single regime `edges` represents, for attributing
-    `NetworkSnapshot`/`DirectionFlip` URIs to the right regime -- those
-    tables (density.py/direction_flips.py's output) carry no run-param
-    columns of their own, unlike `edges`. Raises if `edges` spans more than
-    one regime, since there's then no per-row regime to disambiguate
-    density/flips against."""
-    distinct = edges[_RUN_PARAM_COLUMNS].drop_duplicates()
+def _single_regime_params(table: pd.DataFrame) -> tuple:
+    """The single regime `table` (any DataFrame carrying `_RUN_PARAM_COLUMNS`)
+    represents -- used to attribute `NetworkSnapshot`/`DirectionFlip` URIs
+    (built from density.py/direction_flips.py's output, which carries no
+    run-param columns of its own, unlike `edges`) and `QualitativeSummaryRun`
+    URIs (built from summary.py's bullets table) to the right regime. Raises
+    if `table` spans more than one regime, since there's then no per-row
+    regime to disambiguate against."""
+    distinct = table[_RUN_PARAM_COLUMNS].drop_duplicates()
     if len(distinct) != 1:
         raise ValueError(
-            'density/flips can only be attributed to a single regime, but edges spans '
+            f'can only be attributed to a single regime, but the table spans '
             f'{len(distinct)} distinct regimes'
         )
     row = distinct.iloc[0]
@@ -181,7 +182,7 @@ def _add_edges(graph: Graph, edges: pd.DataFrame) -> None:
 def _add_density(graph: Graph, density: pd.DataFrame, params: tuple) -> None:
     """One `fxpcn:NetworkSnapshot` per date, from `compute_density_table`'s
     output. `params` (the regime `density` was computed under -- see
-    `_edges_regime_params`) is folded into the URI for the same reason
+    `_single_regime_params`) is folded into the URI for the same reason
     `_add_edges` folds it into `EdgeObservation` URIs: distinct regimes'
     snapshots for the same date must not collide when loaded into one graph."""
     regime_slug = _regime_slug(params)
@@ -224,7 +225,7 @@ def _add_density(graph: Graph, density: pd.DataFrame, params: tuple) -> None:
 def _add_flips(graph: Graph, flips: pd.DataFrame, params: tuple) -> None:
     """One `fxpcn:DirectionFlip` per row of `find_direction_flips`'s output.
     `params` (the regime `flips` was computed under -- see
-    `_edges_regime_params`) is folded into the URI for the same collision
+    `_single_regime_params`) is folded into the URI for the same collision
     reason as `_add_edges`/`_add_density`."""
     _add_pairs(graph, set(flips['pair_i']) | set(flips['pair_j']))
     regime_slug = _regime_slug(params)
@@ -259,7 +260,7 @@ def build_graph(
     tables themselves.
 
     `density`/`flips` must be attributable to a single regime (see
-    `_edges_regime_params`) -- `edges` may span more than one, but then only
+    `_single_regime_params`) -- `edges` may span more than one, but then only
     the edge table can be exported, since there'd be no way to tell which
     regime a given density/flips row belongs to.
     """
@@ -267,9 +268,9 @@ def build_graph(
     _bind_namespaces(graph)
     _add_edges(graph, edges)
     if density is not None:
-        _add_density(graph, density, _edges_regime_params(edges))
+        _add_density(graph, density, _single_regime_params(edges))
     if flips is not None:
-        _add_flips(graph, flips, _edges_regime_params(edges))
+        _add_flips(graph, flips, _single_regime_params(edges))
     return graph
 
 
@@ -284,6 +285,55 @@ def run(
     flips = pd.read_parquet(flips_path) if flips_path is not None else None
 
     graph = build_graph(edges, density, flips)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    graph.serialize(destination=str(output_path), format='turtle')
+    return graph
+
+
+def build_summary_graph(bullets: pd.DataFrame) -> Graph:
+    """One `fxpcn:QualitativeSummaryRun` per date in `bullets` (see
+    `summary.bullets_table` -- accumulated across runs via `--append`, so
+    this covers every historical report date, not just the latest), holding
+    that date's LLM-derived takeaway bullets.
+
+    Kept in its own Turtle export (`summary.run`, `fx-pcn export-summary-rdf`)
+    rather than folded into `build_graph`'s output -- the numeric graph must
+    stay exportable even when the LLM/Ollama is down (see `summary.py`'s
+    `None`-on-failure contract), so it can't depend on this step succeeding.
+
+    `prov:wasInformedBy` (not `wasGeneratedBy`) links each run to the
+    regime's own `prov:Activity` (the same URI `build_graph` mints for that
+    regime, via the shared `_activity_uri`) -- correct PROV-O usage for
+    "this activity used output from that activity" rather than claiming the
+    deterministic pipeline itself produced the summary. That, plus
+    `fxpcn:llmModel`, lets a consumer filter LLM opinion out of hard numeric
+    fact by `rdf:type` alone.
+    """
+    graph = Graph()
+    _bind_namespaces(graph)
+    if bullets.empty:
+        return graph
+
+    params = _single_regime_params(bullets)
+    activity_uri = _activity_uri(params)
+    regime_slug = _regime_slug(params)
+
+    for date, rows in bullets.groupby('date', sort=True):
+        run_uri = KG[f'summary-run/{date}/{regime_slug}']
+        graph.add((run_uri, RDF.type, FXPCN.QualitativeSummaryRun))
+        graph.add((run_uri, RDF.type, PROV.Activity))
+        graph.add((run_uri, FXPCN.date, Literal(date, datatype=XSD.date)))
+        graph.add((run_uri, FXPCN.llmModel, Literal(str(rows.iloc[0]['model']))))
+        graph.add((run_uri, PROV.wasInformedBy, activity_uri))
+        for _, row in rows.sort_values('bullet_index').iterrows():
+            graph.add((run_uri, FXPCN.takeawayBullet, Literal(str(row['bullet_text']))))
+    return graph
+
+
+def run_summary_export(bullets_path: Path, output_path: Path) -> Graph:
+    bullets = pd.read_parquet(bullets_path)
+    graph = build_summary_graph(bullets)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     graph.serialize(destination=str(output_path), format='turtle')

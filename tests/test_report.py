@@ -5,15 +5,10 @@ import pandas as pd
 import pytest
 
 from fx_pcn import density as density_mod
+from fx_pcn import report
 from fx_pcn.render_graph import LABEL_THRESHOLD
-from fx_pcn.report import (
-    _d3_graph_data,
-    _latest_edge_rows,
-    _recent_density_rows,
-    _recent_flip_rows,
-    _run_params,
-    generate_report,
-)
+from fx_pcn.report import _d3_graph_data, _latest_edge_rows, generate_report
+from fx_pcn.summary import Summary, recent_density_rows, recent_flip_rows, run_params
 
 DAY1 = datetime.date(2026, 1, 1)
 DAY2 = datetime.date(2026, 1, 2)
@@ -76,14 +71,14 @@ def _synthetic_flips() -> pd.DataFrame:
 
 def test_run_params_reads_most_recent_dates_regime_settings():
     edges = _synthetic_edges()
-    assert _run_params(edges) == _RUN_PARAMS
+    assert run_params(edges) == _RUN_PARAMS
 
 
 def test_recent_density_rows_sorts_ascending_by_date():
     edges = _synthetic_edges()
     density = density_mod.compute_density_table(edges)
 
-    rows = _recent_density_rows(density, n=2)
+    rows = recent_density_rows(density, n=2)
 
     assert [r['date'] for r in rows] == [DAY2, DAY3]
     assert rows[-1]['edge_count'] == 1
@@ -91,14 +86,14 @@ def test_recent_density_rows_sorts_ascending_by_date():
 
 
 def test_recent_flip_rows_sorts_ascending_by_date_then_pair():
-    rows = _recent_flip_rows(_synthetic_flips(), n=10)
+    rows = recent_flip_rows(_synthetic_flips(), n=10)
 
     assert [r['date'] for r in rows] == [DAY2, DAY3]
     assert rows[-1]['new_direction'] == 'EUR/USD<->USD/CAD'
 
 
 def test_recent_flip_rows_handles_empty_table():
-    assert _recent_flip_rows(pd.DataFrame(columns=['date', 'pair_i', 'pair_j'])) == []
+    assert recent_flip_rows(pd.DataFrame(columns=['date', 'pair_i', 'pair_j'])) == []
 
 
 def test_latest_edge_rows_includes_edges_below_the_graph_label_threshold():
@@ -231,3 +226,68 @@ def test_generate_report_replaces_underscores_with_spaces_in_direction_columns(t
 
     assert 'no_edge' not in html
     assert 'no edge' in html
+
+
+def test_generate_report_renders_narrative_and_bullets(tmp_path, monkeypatch):
+    fake_summary = Summary(
+        report_date=DAY3,
+        narrative='First paragraph.\n\nSecond paragraph.',
+        bullets=['Watch EUR/USD.', 'Density is elevated.'],
+        model='fake-model',
+        params=_RUN_PARAMS,
+    )
+    monkeypatch.setattr(report.summary_mod, 'generate_summary', lambda *a, **k: fake_summary)
+    edges = _synthetic_edges()
+    density = density_mod.compute_density_table(edges)
+    flips = _synthetic_flips()
+    output_path = tmp_path / 'report.html'
+
+    generate_report(edges, density, flips, output_path, include_llm_summary=True)
+
+    html = output_path.read_text(encoding='utf-8')
+    assert 'First paragraph.' in html
+    assert 'Second paragraph.' in html
+    assert 'Strategic takeaways' in html
+    assert '<li>Watch EUR/USD.</li>' in html
+    assert '<li>Density is elevated.</li>' in html
+
+
+def test_generate_report_writes_bullets_sidecar(tmp_path, monkeypatch):
+    fake_summary = Summary(
+        report_date=DAY3,
+        narrative='Narrative.',
+        bullets=['A bullet.'],
+        model='fake-model',
+        params=_RUN_PARAMS,
+    )
+    monkeypatch.setattr(report.summary_mod, 'generate_summary', lambda *a, **k: fake_summary)
+    edges = _synthetic_edges()
+    density = density_mod.compute_density_table(edges)
+    flips = _synthetic_flips()
+    output_path = tmp_path / 'report.html'
+    bullets_path = tmp_path / 'bullets.parquet'
+
+    generate_report(
+        edges,
+        density,
+        flips,
+        output_path,
+        include_llm_summary=True,
+        bullets_output_path=bullets_path,
+    )
+
+    bullets = pd.read_parquet(bullets_path)
+    assert bullets['bullet_text'].tolist() == ['A bullet.']
+    assert (bullets['date'] == DAY3).all()
+
+
+def test_generate_report_skips_bullets_sidecar_when_no_path_given(tmp_path, monkeypatch):
+    monkeypatch.setattr(report.summary_mod, 'generate_summary', lambda *a, **k: None)
+    edges = _synthetic_edges()
+    density = density_mod.compute_density_table(edges)
+    flips = _synthetic_flips()
+    output_path = tmp_path / 'report.html'
+
+    generate_report(edges, density, flips, output_path, include_llm_summary=False)
+
+    assert list(tmp_path.iterdir()) == [output_path]

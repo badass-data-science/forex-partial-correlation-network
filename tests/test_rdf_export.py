@@ -6,7 +6,7 @@ from rdflib import RDF, XSD, Literal
 from rdflib.namespace import PROV
 
 from fx_pcn.macro_vocabulary import _currency_uri
-from fx_pcn.rdf_export import FXPCN, _pair_uri, build_graph
+from fx_pcn.rdf_export import FXPCN, _activity_uri, _pair_uri, build_graph, build_summary_graph
 
 _RUN_PARAMS = {
     'window_days': 5,
@@ -212,3 +212,93 @@ def test_flips_table_becomes_direction_flips():
     assert (flip, FXPCN.previousDirection, Literal('EUR/USD->USD/CAD')) in graph
     assert (flip, FXPCN.newDirection, Literal('no_edge')) in graph
     assert (flip, FXPCN.pairA, _pair_uri('EUR/USD')) in graph
+
+
+_BULLETS_COLUMNS = [
+    'date',
+    *_RUN_PARAMS.keys(),
+    'model',
+    'bullet_index',
+    'bullet_text',
+]
+
+
+def _bullets_row(**overrides):
+    row = {
+        'date': datetime.date(2026, 7, 8),
+        **_RUN_PARAMS,
+        'model': 'fake-model',
+        'bullet_index': 0,
+        'bullet_text': 'Watch EUR/USD.',
+    }
+    row.update(overrides)
+    return row
+
+
+def test_build_summary_graph_is_empty_for_empty_bullets():
+    graph = build_summary_graph(pd.DataFrame(columns=_BULLETS_COLUMNS))
+
+    assert len(graph) == 0
+
+
+def test_build_summary_graph_produces_one_run_node_per_date():
+    bullets = pd.DataFrame(
+        [
+            _bullets_row(date=datetime.date(2026, 7, 8), bullet_index=0, bullet_text='First.'),
+            _bullets_row(date=datetime.date(2026, 7, 8), bullet_index=1, bullet_text='Second.'),
+            _bullets_row(date=datetime.date(2026, 7, 9), bullet_index=0, bullet_text='Third.'),
+        ]
+    )
+
+    graph = build_summary_graph(bullets)
+
+    runs = list(graph.subjects(RDF.type, FXPCN.QualitativeSummaryRun))
+    assert len(runs) == 2
+
+
+def test_build_summary_graph_bullets_are_ordered_and_typed():
+    bullets = pd.DataFrame(
+        [
+            _bullets_row(bullet_index=1, bullet_text='Second.'),
+            _bullets_row(bullet_index=0, bullet_text='First.'),
+        ]
+    )
+
+    graph = build_summary_graph(bullets)
+
+    (run,) = graph.subjects(RDF.type, FXPCN.QualitativeSummaryRun)
+    assert (run, RDF.type, PROV.Activity) in graph
+    assert (run, FXPCN.date, Literal(datetime.date(2026, 7, 8), datatype=XSD.date)) in graph
+    assert (run, FXPCN.llmModel, Literal('fake-model')) in graph
+    bullet_texts = {str(o) for o in graph.objects(run, FXPCN.takeawayBullet)}
+    assert bullet_texts == {'First.', 'Second.'}
+
+
+def test_build_summary_graph_links_to_same_activity_as_numeric_export():
+    """The summary run's `prov:wasInformedBy` target must be the exact same
+    URI `build_graph`'s numeric export mints for that regime's `prov:Activity`
+    -- that's what lets the two independently-loaded `.ttl` files join once
+    both are in the same Neo4j graph."""
+    params = (
+        _RUN_PARAMS['window_days'],
+        _RUN_PARAMS['step_days'],
+        _RUN_PARAMS['min_observations'],
+        _RUN_PARAMS['max_lag'],
+        _RUN_PARAMS['fdr_alpha'],
+        _RUN_PARAMS['granularity'],
+    )
+    bullets = pd.DataFrame([_bullets_row()])
+
+    graph = build_summary_graph(bullets)
+
+    (run,) = graph.subjects(RDF.type, FXPCN.QualitativeSummaryRun)
+    assert (run, PROV.wasInformedBy, _activity_uri(params)) in graph
+
+
+def test_build_summary_graph_rejects_ambiguous_multi_regime_bullets():
+    bullets = pd.DataFrame(
+        [_bullets_row(), _bullets_row(granularity='D', window_days=60, step_days=7)]
+    )
+
+    with pytest.raises(ValueError, match='distinct regimes'):
+        build_summary_graph(bullets)

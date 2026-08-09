@@ -335,9 +335,13 @@ changes needed. The event-conditioned regime would need genuinely new logic
 
 `src/fx_pcn/flows.py` runs the full artifact chain (`run-pipeline
 --append` → `compute-density --append` → `find-direction-flips --append` →
-`render-graph` → `export-rdf` → `generate-report`) for four of the five regimes above — every
+`render-graph` → `export-rdf` → `generate-report` [+ its bullets sidecar] →
+`export-summary-rdf`) for four of the five regimes above — every
 regime except event-conditioned, which still needs the calendar-alignment
-logic noted above — every weekday at 6:30pm Eastern. Each regime is an
+logic noted above — every weekday at 6:30pm Eastern. `export-summary-rdf`
+runs independently of `export-rdf` (not a dependency of it), so an
+LLM/Ollama outage can only ever fail the summary steps, never the numeric
+graph. Each regime is an
 independent Prefect deployment of the same flow, not one flow looping over
 all four, so re-running or debugging one never touches the others'
 schedules or history.
@@ -532,6 +536,15 @@ literal is enough for a consumer to join across them, and it keeps each
 table's export as independent as the pure functions that produced the tables
 themselves.
 
+`EdgeObservation`/`NetworkSnapshot`/`DirectionFlip` URIs each fold in a
+regime slug (e.g. `.../w60-s7-mo30-ml3-fdr0.05-D`), not just the date and
+pair(s) — [Automated daily runs](#automated-daily-runs-prefect) produces one
+`.ttl` per regime, and those get loaded into the same Neo4j graph via n10s
+(see the ops runbook's `load-ttl-files-into-Neo4j.cypher`), which enforces a
+unique-URI constraint. Without the regime in the URI, two regimes observing
+the same date/pair would collide and silently overwrite each other's
+properties.
+
 ### HTML report
 
 `generate-report` renders one self-contained HTML file — no sidecar images or
@@ -555,7 +568,9 @@ Only `--edges` and `--output` are required, following the same optionality as
 (via the same `compute_density_table`/`find_direction_flips` functions
 above) if not given. `--model` overrides `LLM_MODEL` for just this run;
 `--no-llm-summary` skips the LLM step (see [Configuration](#configuration)
-for the env vars it reads).
+for the env vars it reads). `--bullets-output`/`--append-bullets` also write
+the LLM summary's takeaway bullets to a parquet sidecar, from this same LLM
+call -- see [Summary-bullets RDF export](#summary-bullets-rdf-export) below.
 
 The report contains, in order:
 
@@ -567,7 +582,7 @@ The report contains, in order:
 | Most recent direction changes | The last 10 `find-direction-flips` rows, sorted ascending by date then pair_i/pair_j: date, pair_i, pair_j, previous/new direction |
 | Distributions | Boxplots of density and mean \|partial corr\| across the full history (date range in the plot title), each marked with that metric's most recent value |
 | Trends | Time series of density and mean \|partial corr\| over the trailing year, each marked with that metric's most recent value |
-| Qualitative summary | An LLM-written interpretation of the above (or a note that it was skipped/unavailable) |
+| Qualitative summary | An LLM-written interpretation of the above (narrative paragraphs, plus a "Strategic takeaways" bullet list), or a note that it was skipped/unavailable |
 
 Templating follows the same strategy as `strategic-report-generator`: Jinja2
 with `autoescape=True` and a `base.html.j2`/`report.html.j2` split
@@ -578,6 +593,59 @@ as the same visual system. D3 v7 is vendored inline
 (`src/fx_pcn/templates/vendor/d3.v7.min.js`) rather than loaded from a CDN, so
 the report still renders offline as a single file — no network access needed
 to view it, only to generate its LLM summary.
+
+### Summary-bullets RDF export
+
+The qualitative summary's narrative is free text, not something worth
+forcing into triples — but its closing "strategic takeaways" are short,
+discrete claims, and those *are* worth having in RDF too, for asking
+questions like "what has the network's qualitative read been over the last
+few weeks" against a knowledge graph rather than only ever seeing the
+latest report. `generate-report`'s prompt (`fx_pcn.summary`) asks the model
+to close with a fixed `STRATEGIC TAKEAWAYS:` heading followed by bullet
+lines; those get parsed out and rendered both as the HTML report's
+"Strategic takeaways" list and, via `export-summary-rdf`, as RDF:
+
+```bash
+# Part of generate-report, from the same LLM call as the HTML narrative --
+# not a second, potentially inconsistent one:
+fx-pcn generate-report \
+  --edges output/edges.parquet \
+  --output output/report.html \
+  --bullets-output output/bullets.parquet \
+  --append-bullets
+
+# Turn the accumulated bullets table into RDF/Turtle:
+fx-pcn export-summary-rdf --bullets output/bullets.parquet --output output/summary.ttl
+```
+
+`--append-bullets` accumulates one row per bullet per report date into
+`--bullets-output` — the same `merge_incremental` pattern
+`compute-density`/`find-direction-flips` already use — rather than
+overwriting it each run, so `export-summary-rdf`'s output covers every
+historical report date's takeaways, not just the latest. (`generate-summary`
+is the standalone equivalent of `generate-report --bullets-output`, for
+generating/inspecting the bullets table without also rendering the HTML.)
+
+| Node | Meaning |
+|---|---|
+| `fxpcn:QualitativeSummaryRun` | One per report date, at `kg:summary-run/<date>/<regime-slug>`: `fxpcn:date`, `fxpcn:llmModel` (the `litellm` model string), and one `fxpcn:takeawayBullet` literal per bullet |
+
+Each `QualitativeSummaryRun` links to that regime's `prov:Activity` (the
+same node `export-rdf` mints — see above) via `prov:wasInformedBy`, not
+`prov:wasGeneratedBy` — correct PROV-O usage for "this activity used output
+from that activity," rather than claiming the deterministic pipeline itself
+produced the summary. That distinction, plus `fxpcn:llmModel`, is what lets
+a consumer filter LLM-derived opinion out of hard numeric fact by `rdf:type`
+alone.
+
+This is deliberately a second, independent `.ttl` file rather than folded
+into `export-rdf`'s output: the numeric graph must stay exportable even
+when the LLM/Ollama is down (`generate-report`/`generate-summary` already
+degrade gracefully — an unavailable LLM just means no bullets that day, not
+a failed run), so it can't depend on this step succeeding. The two files
+stay joinable once both are loaded into the same Neo4j graph precisely
+because they compute the identical `prov:Activity` URI for a given regime.
 
 ### The currency → region/institution vocabulary layer
 
@@ -725,7 +793,12 @@ src/fx_pcn/
   direction_flips.py       Detects edge-direction changes date over date (find-direction-flips)
   incremental.py           Shared "append only new dates" merge helper
   report.py                Self-contained HTML report: graph, plots, tables, LLM summary (generate-report)
+  summary.py               LLM qualitative-summary prompt/call + takeaway-bullets table (generate-summary; shared by generate-report)
   templates/                Jinja2 templates for the HTML report (base.html.j2, report.html.j2)
+  ontology.py              Shared RDF namespace constants (fxpcn:, kg:)
+  rdf_export.py            Edge/density/flips table -> RDF/Turtle (export-rdf)
+  macro_vocabulary.py       Static currency -> region/institution SKOS layer, used by rdf_export.py
+  flows.py                 Prefect scheduling for the full artifact chain, per parameter regime
 tests/                    Statistical logic tested on synthetic, ground-truth data
 ```
 
