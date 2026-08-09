@@ -162,10 +162,7 @@ def _d3_graph_data(edges: pd.DataFrame) -> str:
 
     payload = {'nodes': [{'id': node_id} for node_id in node_ids], 'links': links}
     return (
-        json.dumps(payload)
-        .replace('<', '\\u003c')
-        .replace('>', '\\u003e')
-        .replace('&', '\\u0026')
+        json.dumps(payload).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
     )
 
 

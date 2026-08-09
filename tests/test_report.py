@@ -180,14 +180,26 @@ def test_generate_report_writes_self_contained_html(tmp_path):
     # caption used to be baked into the Graphviz PNG; now it's plain HTML text
     assert 'Blue = positive, red = negative partial correlation' in html
     assert 'About this report' in html
-    for term in ('Partial correlation', 'Granger causality', 'Density',
-                 'Mean absolute partial correlation', 'Direction'):
+    for term in (
+        'Partial correlation',
+        'Granger causality',
+        'Density',
+        'Mean absolute partial correlation',
+        'Direction',
+    ):
         assert term in html
     assert 'Table of Contents' in html
     # ToC comes before the "About this report" *div* (id="about"), not just its own link text
     assert html.index('Table of Contents') < html.index('id="about"')
-    for anchor in ('about', 'network-graph', 'recent-data', 'recent-direction-changes',
-                    'distributions', 'trends', 'summary'):
+    for anchor in (
+        'about',
+        'network-graph',
+        'recent-data',
+        'recent-direction-changes',
+        'distributions',
+        'trends',
+        'summary',
+    ):
         assert f'href="#{anchor}"' in html
         assert f'id="{anchor}"' in html
     blog_url = 'https://badassdatascience.substack.com/p/our-heroine-wiretaps-seven-currency'
