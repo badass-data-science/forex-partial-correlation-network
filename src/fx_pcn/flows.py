@@ -174,17 +174,39 @@ def _export_rdf_task(
 
 @task(retries=3, retry_delay_seconds=30)
 def _generate_report_task(
-    edges_path: Path, output_path: Path, density_path: Path, flips_path: Path
+    edges_path: Path,
+    output_path: Path,
+    density_path: Path,
+    flips_path: Path,
+    bullets_path: Path,
 ) -> None:
-    report.run(edges_path, output_path, density_path=density_path, flips_path=flips_path)
+    report.run(
+        edges_path,
+        output_path,
+        density_path=density_path,
+        flips_path=flips_path,
+        bullets_output_path=bullets_path,
+        append_bullets=True,
+    )
+
+
+@task
+def _export_summary_rdf_task(bullets_path: Path, output_path: Path) -> None:
+    rdf_export.run_summary_export(bullets_path, output_path)
 
 
 @flow(name='fx-pcn-regime-pipeline', log_prints=True)
 def regime_pipeline_flow(regime: str, output_dir: str = str(DEFAULT_OUTPUT_DIR)) -> None:
     """Runs the full artifact chain (edges -> density -> direction flips ->
-    graph PNG -> RDF export -> HTML report) for one named entry in
-    `REGIME_PARAMS`, `--append`ing each parquet rather than rebuilding it
-    from scratch."""
+    graph PNG -> RDF export -> HTML report + summary bullets -> summary RDF
+    export) for one named entry in `REGIME_PARAMS`, `--append`ing each
+    parquet rather than rebuilding it from scratch.
+
+    The summary RDF export is a second, independent `.ttl` file (not folded
+    into the numeric one export_rdf produces) so an LLM/Ollama outage can
+    only ever fail `_generate_report_task`/`_export_summary_rdf_task`, never
+    the numeric graph that `_export_rdf_task` produces from deterministic
+    data alone."""
     params = REGIME_PARAMS[regime]
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -198,13 +220,16 @@ def regime_pipeline_flow(regime: str, output_dir: str = str(DEFAULT_OUTPUT_DIR))
     graph_path = path_for('graph-most-recent-window', 'png')
     rdf_path = path_for('RDF', 'ttl')
     report_path = path_for('report', 'html')
+    bullets_path = path_for('summary-bullets', 'parquet')
+    summary_rdf_path = path_for('RDF-summary', 'ttl')
 
     _run_pipeline_task(edges_path, params)
     _compute_density_task(edges_path, density_path)
     _find_direction_flips_task(edges_path, flips_path)
     _render_graph_task(edges_path, graph_path)
     _export_rdf_task(edges_path, rdf_path, density_path, flips_path)
-    _generate_report_task(edges_path, report_path, density_path, flips_path)
+    _generate_report_task(edges_path, report_path, density_path, flips_path, bullets_path)
+    _export_summary_rdf_task(bullets_path, summary_rdf_path)
 
 
 if __name__ == '__main__':

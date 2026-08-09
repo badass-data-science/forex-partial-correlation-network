@@ -5,7 +5,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from fx_pcn import config, density, direction_flips, rdf_export, render_graph, report
+from fx_pcn import config, density, direction_flips, rdf_export, render_graph, report, summary
 from fx_pcn.influx_client import DEFAULT_START
 from fx_pcn.pipeline import run as run_pipeline
 
@@ -68,8 +68,27 @@ def _generate_report(args: argparse.Namespace) -> None:
         flips_path=args.flips,
         model=args.model,
         include_llm_summary=not args.no_llm_summary,
+        bullets_output_path=args.bullets_output,
+        append_bullets=args.append_bullets,
     )
     print(f'Wrote {args.output}')
+
+
+def _generate_summary(args: argparse.Namespace) -> None:
+    bullets = summary.run(
+        edges_path=args.edges,
+        density_path=args.density,
+        flips_path=args.flips,
+        output_path=args.output,
+        model=args.model,
+        append=args.append,
+    )
+    print(bullets.tail(20))
+
+
+def _export_summary_rdf(args: argparse.Namespace) -> None:
+    graph = rdf_export.run_summary_export(bullets_path=args.bullets, output_path=args.output)
+    print(f'Wrote {len(graph)} triples to {args.output}')
 
 
 def _add_run_pipeline_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -245,7 +264,72 @@ def _add_generate_report_parser(subparsers: argparse._SubParsersAction) -> None:
         action='store_true',
         help='Skip the LLM-generated qualitative summary (no network call)',
     )
+    parser.add_argument(
+        '--bullets-output',
+        type=Path,
+        default=None,
+        help="Optional output path for the LLM summary's takeaway bullets (parquet), for "
+        'export-summary-rdf to consume -- computed from the same LLM call as the HTML '
+        'summary, not a second one',
+    )
+    parser.add_argument(
+        '--append-bullets',
+        action='store_true',
+        help='Append new dates to an existing --bullets-output file instead of overwriting it '
+        '(has no effect if --bullets-output is not given or the file does not exist yet)',
+    )
     parser.set_defaults(handler=_generate_report)
+
+
+def _add_generate_summary_parser(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser(
+        'generate-summary',
+        help='Standalone LLM qualitative-summary bullets (parquet) -- generate-report already '
+        'produces these via --bullets-output as part of one shared LLM call; use this only to '
+        'generate/inspect them without also rendering the HTML report',
+    )
+    parser.add_argument(
+        '--edges', type=Path, required=True, help='Edge-table parquet produced by run-pipeline'
+    )
+    parser.add_argument(
+        '--density',
+        type=Path,
+        required=True,
+        help='Density-table parquet produced by compute-density',
+    )
+    parser.add_argument(
+        '--flips',
+        type=Path,
+        required=True,
+        help='Direction-flips-table parquet produced by find-direction-flips',
+    )
+    parser.add_argument('--output', type=Path, required=True, help='Bullets output path (parquet)')
+    parser.add_argument(
+        '--model',
+        type=str,
+        default=None,
+        help='litellm model string for the qualitative summary '
+        '(default: env LLM_MODEL or ollama_chat/glm-5.2:cloud)',
+    )
+    parser.add_argument(
+        '--append',
+        action='store_true',
+        help='Append new dates to an existing --output file instead of overwriting it',
+    )
+    parser.set_defaults(handler=_generate_summary)
+
+
+def _add_export_summary_rdf_parser(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser(
+        'export-summary-rdf',
+        help='Export a summary-bullets table (from generate-report --bullets-output or '
+        'generate-summary) as RDF/Turtle',
+    )
+    parser.add_argument(
+        '--bullets', type=Path, required=True, help='Bullets-table parquet (see generate-summary)'
+    )
+    parser.add_argument('--output', type=Path, required=True, help='Turtle (.ttl) output path')
+    parser.set_defaults(handler=_export_summary_rdf)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -257,6 +341,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_find_direction_flips_parser(subparsers)
     _add_export_rdf_parser(subparsers)
     _add_generate_report_parser(subparsers)
+    _add_generate_summary_parser(subparsers)
+    _add_export_summary_rdf_parser(subparsers)
     return parser
 
 

@@ -403,9 +403,17 @@
     readout of the data. Please apply judgement before acting on this interpretation.
     <strong>Caveat emptor!</strong></p>
   <div class="summary">
-    {% for paragraph in llm_summary.split('\n\n') %}
+    {% for paragraph in llm_summary.narrative.split('\n\n') %}
     <p>{{ paragraph }}</p>
     {% endfor %}
+    {% if llm_summary.bullets %}
+    <h3>Strategic takeaways</h3>
+    <ul>
+      {% for bullet in llm_summary.bullets %}
+      <li>{{ bullet }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
   </div>
   {% elif llm_summary_enabled %}
   <p class="no-data">LLM summary unavailable (the call failed or returned no content) — see logs.</p>
