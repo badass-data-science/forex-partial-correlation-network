@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `export-summary-rdf`: `QualitativeSummaryRun` nodes only carried network
+  identity indirectly, via `prov:wasInformedBy` to an Activity URI whose
+  `fxpcn:networkName`/`fxpcn:network` triples are only asserted in
+  `export-rdf`'s (numeric graph's) output -- a separate `.ttl` file
+  graph-nexus can register as an independent source. A `graph-nexus-ask`
+  query against just the summary graph had no way to filter/identify runs
+  by network name at all. `build_summary_graph` now asserts
+  `fxpcn:networkName`/`fxpcn:network` directly on each `QualitativeSummaryRun`
+  too, sourced from the bullets table's own `network_name` column, so the
+  summary graph is queryable by network name standalone.
+
 ### Added
 - `run-pipeline --pairs`/`--network-name`: build the network from any set of
   currency pairs, not just the default 7 majors (`config.DEFAULT_NETWORK_NAME`,
