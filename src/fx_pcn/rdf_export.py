@@ -23,13 +23,40 @@ def _pair_uri(pair: str) -> URIRef:
     return KG[f'pair/{pair.replace("/", "")}']
 
 
-def _activity_uri(params: tuple) -> URIRef:
+def _regime_slug(params: tuple) -> str:
     window_days, step_days, min_observations, max_lag, fdr_alpha, granularity = params
-    slug = (
-        f'run/w{window_days}-s{step_days}-mo{min_observations}'
+    return (
+        f'w{window_days}-s{step_days}-mo{min_observations}'
         f'-ml{max_lag}-fdr{fdr_alpha}-{granularity}'
     )
-    return KG[slug]
+
+
+def _activity_uri(params: tuple) -> URIRef:
+    return KG[f'run/{_regime_slug(params)}']
+
+
+def _edges_regime_params(edges: pd.DataFrame) -> tuple:
+    """The single regime `edges` represents, for attributing
+    `NetworkSnapshot`/`DirectionFlip` URIs to the right regime -- those
+    tables (density.py/direction_flips.py's output) carry no run-param
+    columns of their own, unlike `edges`. Raises if `edges` spans more than
+    one regime, since there's then no per-row regime to disambiguate
+    density/flips against."""
+    distinct = edges[_RUN_PARAM_COLUMNS].drop_duplicates()
+    if len(distinct) != 1:
+        raise ValueError(
+            'density/flips can only be attributed to a single regime, but edges spans '
+            f'{len(distinct)} distinct regimes'
+        )
+    row = distinct.iloc[0]
+    return (
+        int(row['window_days']),
+        int(row['step_days']),
+        int(row['min_observations']),
+        int(row['max_lag']),
+        float(row['fdr_alpha']),
+        str(row['granularity']),
+    )
 
 
 def _bind_namespaces(graph: Graph) -> None:
@@ -76,7 +103,15 @@ def _add_activities(graph: Graph, edges: pd.DataFrame) -> dict[tuple, URIRef]:
 
 
 def _add_edges(graph: Graph, edges: pd.DataFrame) -> None:
-    """One `fxpcn:EdgeObservation` per (date, pair_i, pair_j) row.
+    """One `fxpcn:EdgeObservation` per (date, pair_i, pair_j, regime) row.
+
+    The regime slug is folded into the URI (not just reachable via
+    `prov:wasGeneratedBy`) because different regimes' `.ttl` exports get
+    loaded into the same Neo4j graph via n10s (see
+    operation-clusterfuck/scripts/.../load-ttl-files-into-Neo4j.cypher) --
+    without it, two regimes observing the same (date, pair_i, pair_j) would
+    collide on n10s's unique-URI constraint and silently overwrite each
+    other's properties.
 
     `fxpcn:source`/`fxpcn:target` are only emitted when the row's `direction`
     names a single unambiguous leader (`i->j` or `j->i`) -- mirroring
@@ -96,7 +131,16 @@ def _add_edges(graph: Graph, edges: pd.DataFrame) -> None:
         direction = str(row['direction'])
         pair_a_slug = pair_i.replace('/', '')
         pair_b_slug = pair_j.replace('/', '')
-        obs = KG[f'edge-observation/{row["date"]}/{pair_a_slug}-{pair_b_slug}']
+        params = (
+            int(row['window_days']),
+            int(row['step_days']),
+            int(row['min_observations']),
+            int(row['max_lag']),
+            float(row['fdr_alpha']),
+            str(row['granularity']),
+        )
+        regime_slug = _regime_slug(params)
+        obs = KG[f'edge-observation/{row["date"]}/{pair_a_slug}-{pair_b_slug}/{regime_slug}']
 
         graph.add((obs, RDF.type, FXPCN.EdgeObservation))
         graph.add((obs, FXPCN.date, Literal(row['date'], datatype=XSD.date)))
@@ -132,21 +176,18 @@ def _add_edges(graph: Graph, edges: pd.DataFrame) -> None:
             graph.add((obs, FXPCN.source, _pair_uri(pair_j)))
             graph.add((obs, FXPCN.target, _pair_uri(pair_i)))
 
-        params = (
-            int(row['window_days']),
-            int(row['step_days']),
-            int(row['min_observations']),
-            int(row['max_lag']),
-            float(row['fdr_alpha']),
-            str(row['granularity']),
-        )
         graph.add((obs, PROV.wasGeneratedBy, activities[params]))
 
 
-def _add_density(graph: Graph, density: pd.DataFrame) -> None:
-    """One `fxpcn:NetworkSnapshot` per date, from `compute_density_table`'s output."""
+def _add_density(graph: Graph, density: pd.DataFrame, params: tuple) -> None:
+    """One `fxpcn:NetworkSnapshot` per date, from `compute_density_table`'s
+    output. `params` (the regime `density` was computed under -- see
+    `_edges_regime_params`) is folded into the URI for the same reason
+    `_add_edges` folds it into `EdgeObservation` URIs: distinct regimes'
+    snapshots for the same date must not collide when loaded into one graph."""
+    regime_slug = _regime_slug(params)
     for _, row in density.iterrows():
-        snap = KG[f'network-snapshot/{row["date"]}']
+        snap = KG[f'network-snapshot/{row["date"]}/{regime_slug}']
         graph.add((snap, RDF.type, FXPCN.NetworkSnapshot))
         graph.add((snap, FXPCN.date, Literal(row['date'], datatype=XSD.date)))
         graph.add((snap, FXPCN.edgeCount, Literal(int(row['edge_count']), datatype=XSD.integer)))
@@ -181,16 +222,20 @@ def _add_density(graph: Graph, density: pd.DataFrame) -> None:
         )
 
 
-def _add_flips(graph: Graph, flips: pd.DataFrame) -> None:
-    """One `fxpcn:DirectionFlip` per row of `find_direction_flips`'s output."""
+def _add_flips(graph: Graph, flips: pd.DataFrame, params: tuple) -> None:
+    """One `fxpcn:DirectionFlip` per row of `find_direction_flips`'s output.
+    `params` (the regime `flips` was computed under -- see
+    `_edges_regime_params`) is folded into the URI for the same collision
+    reason as `_add_edges`/`_add_density`."""
     _add_pairs(graph, set(flips['pair_i']) | set(flips['pair_j']))
+    regime_slug = _regime_slug(params)
 
     for _, row in flips.iterrows():
         pair_i = str(row['pair_i'])
         pair_j = str(row['pair_j'])
         pair_a_slug = pair_i.replace('/', '')
         pair_b_slug = pair_j.replace('/', '')
-        flip = KG[f'direction-flip/{row["date"]}/{pair_a_slug}-{pair_b_slug}']
+        flip = KG[f'direction-flip/{row["date"]}/{pair_a_slug}-{pair_b_slug}/{regime_slug}']
 
         graph.add((flip, RDF.type, FXPCN.DirectionFlip))
         graph.add((flip, FXPCN.date, Literal(row['date'], datatype=XSD.date)))
@@ -213,14 +258,19 @@ def build_graph(
     literal is enough for a consumer to join across them, and it keeps each
     table's export as independent as the pure functions that produced the
     tables themselves.
+
+    `density`/`flips` must be attributable to a single regime (see
+    `_edges_regime_params`) -- `edges` may span more than one, but then only
+    the edge table can be exported, since there'd be no way to tell which
+    regime a given density/flips row belongs to.
     """
     graph = Graph()
     _bind_namespaces(graph)
     _add_edges(graph, edges)
     if density is not None:
-        _add_density(graph, density)
+        _add_density(graph, density, _edges_regime_params(edges))
     if flips is not None:
-        _add_flips(graph, flips)
+        _add_flips(graph, flips, _edges_regime_params(edges))
     return graph
 
 

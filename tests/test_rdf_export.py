@@ -1,6 +1,7 @@
 import datetime
 
 import pandas as pd
+import pytest
 from rdflib import RDF, XSD, Literal
 from rdflib.namespace import PROV
 
@@ -125,6 +126,70 @@ def test_density_table_becomes_network_snapshots():
     (snap,) = snapshots
     assert (snap, FXPCN.edgeCount, Literal(17, datatype=XSD.integer)) in graph
     assert (snap, FXPCN.bidirectedEdgeCount, Literal(3, datatype=XSD.integer)) in graph
+
+
+def test_edge_observation_uris_differ_across_regimes_for_same_date_and_pair():
+    """Regression test: two regimes' `.ttl` exports get loaded into the same
+    Neo4j graph via n10s (see load-ttl-files-into-Neo4j.cypher), so an
+    EdgeObservation URI keyed only by (date, pair_i, pair_j) would collide
+    across regimes and silently overwrite one regime's properties with the
+    other's."""
+    default_edge = _edges_row()
+    other_regime_edge = _edges_row(granularity='D', window_days=60, step_days=7)
+
+    default_graph = build_graph(pd.DataFrame([default_edge]))
+    other_graph = build_graph(pd.DataFrame([other_regime_edge]))
+
+    default_obs = next(default_graph.subjects(RDF.type, FXPCN.EdgeObservation))
+    other_obs = next(other_graph.subjects(RDF.type, FXPCN.EdgeObservation))
+    assert default_obs != other_obs
+
+
+def test_density_and_flips_uris_differ_across_regimes_for_same_date():
+    density = pd.DataFrame(
+        [
+            {
+                'date': datetime.date(2026, 7, 8),
+                'edge_count': 17,
+                'density': 17 / 21,
+                'mean_abs_partial_corr': 0.22,
+                'directed_edge_count': 4,
+                'bidirected_edge_count': 3,
+                'undirected_edge_count': 10,
+            }
+        ]
+    )
+
+    default_graph = build_graph(pd.DataFrame([_edges_row()]), density=density)
+    other_graph = build_graph(
+        pd.DataFrame([_edges_row(granularity='D', window_days=60, step_days=7)]), density=density
+    )
+
+    default_snap = next(default_graph.subjects(RDF.type, FXPCN.NetworkSnapshot))
+    other_snap = next(other_graph.subjects(RDF.type, FXPCN.NetworkSnapshot))
+    assert default_snap != other_snap
+
+
+def test_build_graph_rejects_ambiguous_multi_regime_density():
+    edges = pd.DataFrame(
+        [_edges_row(), _edges_row(granularity='D', window_days=60, step_days=7)]
+    )
+    density = pd.DataFrame(
+        [
+            {
+                'date': datetime.date(2026, 7, 8),
+                'edge_count': 17,
+                'density': 17 / 21,
+                'mean_abs_partial_corr': 0.22,
+                'directed_edge_count': 4,
+                'bidirected_edge_count': 3,
+                'undirected_edge_count': 10,
+            }
+        ]
+    )
+
+    with pytest.raises(ValueError, match='distinct regimes'):
+        build_graph(edges, density=density)
 
 
 def test_flips_table_becomes_direction_flips():
