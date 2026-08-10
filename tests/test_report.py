@@ -25,6 +25,7 @@ _RUN_PARAMS = {
 }
 
 _TEST_PAIRS = 'EUR/USD,GBP/USD,USD/JPY,USD/CHF,USD/CAD,AUD/USD,NZD/USD'
+_TEST_PAIRS_LIST = _TEST_PAIRS.split(',')
 
 
 def _edges_row(**overrides: object) -> dict:
@@ -239,6 +240,7 @@ def test_generate_report_renders_narrative_and_bullets(tmp_path, monkeypatch):
         bullets=['Watch EUR/USD.', 'Density is elevated.'],
         model='fake-model',
         params=_RUN_PARAMS,
+        pairs=_TEST_PAIRS_LIST,
     )
     monkeypatch.setattr(report.summary_mod, 'generate_summary', lambda *a, **k: fake_summary)
     edges = _synthetic_edges()
@@ -263,6 +265,7 @@ def test_generate_report_writes_bullets_sidecar(tmp_path, monkeypatch):
         bullets=['A bullet.'],
         model='fake-model',
         params=_RUN_PARAMS,
+        pairs=_TEST_PAIRS_LIST,
     )
     monkeypatch.setattr(report.summary_mod, 'generate_summary', lambda *a, **k: fake_summary)
     edges = _synthetic_edges()

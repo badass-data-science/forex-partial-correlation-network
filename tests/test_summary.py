@@ -18,6 +18,7 @@ _RUN_PARAMS = {
 }
 
 _TEST_PAIRS = 'EUR/USD,GBP/USD,USD/JPY,USD/CHF,USD/CAD,AUD/USD,NZD/USD'
+_TEST_PAIRS_LIST = _TEST_PAIRS.split(',')
 
 
 def _edges_row(**overrides: object) -> dict:
@@ -79,7 +80,12 @@ def test_bullets_table_empty_when_summary_is_none():
 
 def test_bullets_table_empty_when_summary_has_no_bullets():
     result = summary.Summary(
-        report_date=DAY1, narrative='text', bullets=[], model='m', params=_RUN_PARAMS
+        report_date=DAY1,
+        narrative='text',
+        bullets=[],
+        model='m',
+        params=_RUN_PARAMS,
+        pairs=_TEST_PAIRS_LIST,
     )
 
     assert summary.bullets_table(result).empty
@@ -92,6 +98,7 @@ def test_bullets_table_one_row_per_bullet_in_order():
         bullets=['first', 'second'],
         model='fake-model',
         params=_RUN_PARAMS,
+        pairs=_TEST_PAIRS_LIST,
     )
 
     table = summary.bullets_table(result)
@@ -102,6 +109,7 @@ def test_bullets_table_one_row_per_bullet_in_order():
     assert (table['date'] == DAY1).all()
     assert (table['model'] == 'fake-model').all()
     assert (table['window_days'] == _RUN_PARAMS['window_days']).all()
+    assert (table['pairs'] == _TEST_PAIRS).all()
 
 
 def test_generate_summary_returns_none_when_llm_call_fails(monkeypatch):
@@ -154,6 +162,7 @@ def test_generate_summary_parses_llm_response(monkeypatch):
     assert result.narrative == 'Narrative here.'
     assert result.bullets == ['Watch EUR/USD.']
     assert result.params == _RUN_PARAMS
+    assert result.pairs == _TEST_PAIRS_LIST
 
 
 def test_run_append_accumulates_across_dates(tmp_path, monkeypatch):

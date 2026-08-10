@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `export-summary-rdf`: each `QualitativeSummaryRun` now links
+  `fxpcn:mentionsPair` to every one of the network's own `fxpcn:CurrencyPair`s
+  whose exact string appears literally in any of that run's bullets -- a
+  closed-vocabulary substring check against the network's own pair list
+  (the LLM is only ever prompted with this network's own pair names, so
+  there's no free-text entity-extraction ambiguity to resolve), not a bare
+  currency-code or colloquial-name match. `summary.Summary`/`bullets_table`
+  gained a `pairs` field/column (comma-joined, mirroring the edge table's
+  own `pairs` column) to carry the network's pair vocabulary through to
+  `export-summary-rdf`, kept separate from `_RUN_PARAM_COLUMNS` so it
+  doesn't also duplicate into the LLM prompt's "Run parameters" line.
+
 ### Fixed
 - `export-summary-rdf`: `QualitativeSummaryRun` nodes only carried network
   identity indirectly, via `prov:wasInformedBy` to an Activity URI whose
