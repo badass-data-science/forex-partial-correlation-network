@@ -365,6 +365,16 @@ def build_summary_graph(bullets: pd.DataFrame) -> Graph:
     consumer querying this summary graph on its own (not merged with its
     numeric sibling in the same store) would have no way to filter or
     identify runs by network name at all.
+
+    Each run also links `fxpcn:mentionsPair` to every one of the network's
+    own `fxpcn:CurrencyPair`s whose exact string (e.g. `EUR/USD`) appears
+    literally in any of that run's bullets -- a closed-vocabulary substring
+    check against `bullets`'s own `pairs` column (see network.build_edge_table),
+    not free-text entity extraction, since the LLM was only ever prompted
+    with this network's own pair names to begin with. One `mentionsPair`
+    triple per pair per run, not per bullet: bullets aren't reified as their
+    own nodes here (see `takeawayBullet` below), so this is the finest
+    granularity available without a larger modeling change.
     """
     graph = Graph()
     _bind_namespaces(graph)
@@ -376,6 +386,8 @@ def build_summary_graph(bullets: pd.DataFrame) -> Graph:
     regime_slug = _regime_slug(params)
     network_name = str(bullets['network_name'].iloc[0])
     network_uri = _network_uri(network_name)
+    pairs = str(bullets['pairs'].iloc[0]).split(',')
+    _add_pairs(graph, set(pairs))
 
     for date, rows in bullets.groupby('date', sort=True):
         run_uri = KG[f'summary-run/{date}/{regime_slug}']
@@ -386,8 +398,14 @@ def build_summary_graph(bullets: pd.DataFrame) -> Graph:
         graph.add((run_uri, FXPCN.networkName, Literal(network_name)))
         graph.add((run_uri, FXPCN.network, network_uri))
         graph.add((run_uri, PROV.wasInformedBy, activity_uri))
+
+        mentioned_pairs: set[str] = set()
         for _, row in rows.sort_values('bullet_index').iterrows():
-            graph.add((run_uri, FXPCN.takeawayBullet, Literal(str(row['bullet_text']))))
+            bullet_text = str(row['bullet_text'])
+            graph.add((run_uri, FXPCN.takeawayBullet, Literal(bullet_text)))
+            mentioned_pairs |= {pair for pair in pairs if pair in bullet_text}
+        for pair in sorted(mentioned_pairs):
+            graph.add((run_uri, FXPCN.mentionsPair, _pair_uri(pair)))
     return graph
 
 

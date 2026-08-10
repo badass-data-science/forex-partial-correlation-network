@@ -38,6 +38,7 @@ _FLIPS_TABLE_COLUMNS = ['date', 'pair_i', 'pair_j', 'previous_direction', 'new_d
 _BULLETS_TABLE_COLUMNS = [
     'date',
     *_RUN_PARAM_COLUMNS,
+    'pairs',
     'model',
     'bullet_index',
     'bullet_text',
@@ -206,6 +207,7 @@ class Summary:
     bullets: list[str]
     model: str
     params: dict
+    pairs: list[str]
 
 
 def generate_summary(
@@ -236,6 +238,7 @@ def generate_summary(
         bullets=bullets,
         model=model or _DEFAULT_MODEL,
         params=params,
+        pairs=pairs,
     )
 
 
@@ -245,7 +248,15 @@ def bullets_table(summary: Summary | None) -> pd.DataFrame:
     `summary` is `None` or produced no bullets. Column name is `date`. not
     `report_date`, to match `merge_incremental`'s hardcoded column name --
     this table accumulates across runs via `--append` the same way
-    density/flips tables do, not overwritten each run."""
+    density/flips tables do, not overwritten each run.
+
+    `pairs` (comma-joined, mirroring `network.build_edge_table`'s own edge-table
+    column) rides along separately from `summary.params` -- not folded into
+    `_RUN_PARAM_COLUMNS` -- so `export-summary-rdf` can recover the network's
+    full pair vocabulary to check each bullet's text against for
+    `fxpcn:mentionsPair`, without it also polluting the LLM prompt's
+    already-explicit "Run parameters" line with a redundant pair list.
+    """
     if summary is None or not summary.bullets:
         return pd.DataFrame(columns=_BULLETS_TABLE_COLUMNS)
     return pd.DataFrame(
@@ -253,6 +264,7 @@ def bullets_table(summary: Summary | None) -> pd.DataFrame:
             {
                 'date': summary.report_date,
                 **summary.params,
+                'pairs': ','.join(summary.pairs),
                 'model': summary.model,
                 'bullet_index': i,
                 'bullet_text': bullet,

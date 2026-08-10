@@ -279,6 +279,7 @@ def test_flips_table_becomes_direction_flips():
 _BULLETS_COLUMNS = [
     'date',
     *_RUN_PARAMS.keys(),
+    'pairs',
     'model',
     'bullet_index',
     'bullet_text',
@@ -289,6 +290,7 @@ def _bullets_row(**overrides):
     row = {
         'date': datetime.date(2026, 7, 8),
         **_RUN_PARAMS,
+        'pairs': _TEST_PAIRS,
         'model': 'fake-model',
         'bullet_index': 0,
         'bullet_text': 'Watch EUR/USD.',
@@ -371,6 +373,45 @@ def test_build_summary_graph_asserts_network_name_directly_on_each_run():
     (run,) = graph.subjects(RDF.type, FXPCN.QualitativeSummaryRun)
     assert (run, FXPCN.networkName, Literal('forex-network-european-majors')) in graph
     assert (run, FXPCN.network, _network_uri('forex-network-european-majors')) in graph
+
+
+def test_build_summary_graph_links_mentioned_pairs_across_all_of_a_runs_bullets():
+    bullets = pd.DataFrame(
+        [
+            _bullets_row(bullet_index=0, bullet_text='Watch EUR/USD closely this week.'),
+            _bullets_row(bullet_index=1, bullet_text='USD/CHF also worth monitoring.'),
+        ]
+    )
+
+    graph = build_summary_graph(bullets)
+
+    (run,) = graph.subjects(RDF.type, FXPCN.QualitativeSummaryRun)
+    mentioned = set(graph.objects(run, FXPCN.mentionsPair))
+    assert mentioned == {_pair_uri('EUR/USD'), _pair_uri('USD/CHF')}
+    # the linked pair also gets typed, even in the standalone summary graph
+    assert (_pair_uri('EUR/USD'), RDF.type, FXPCN.CurrencyPair) in graph
+
+
+def test_build_summary_graph_does_not_link_pairs_never_mentioned():
+    bullets = pd.DataFrame([_bullets_row(bullet_text='Watch EUR/USD closely this week.')])
+
+    graph = build_summary_graph(bullets)
+
+    (run,) = graph.subjects(RDF.type, FXPCN.QualitativeSummaryRun)
+    mentioned = set(graph.objects(run, FXPCN.mentionsPair))
+    assert mentioned == {_pair_uri('EUR/USD')}
+    assert _pair_uri('USD/CAD') not in mentioned
+
+
+def test_build_summary_graph_does_not_link_a_bare_currency_code():
+    # 'USD' alone is not 'EUR/USD' or any other pair in the network's own
+    # vocabulary -- only an exact pair string counts as a mention.
+    bullets = pd.DataFrame([_bullets_row(bullet_text='The USD looks broadly strong today.')])
+
+    graph = build_summary_graph(bullets)
+
+    (run,) = graph.subjects(RDF.type, FXPCN.QualitativeSummaryRun)
+    assert set(graph.objects(run, FXPCN.mentionsPair)) == set()
 
 
 def test_build_summary_graph_rejects_ambiguous_multi_regime_bullets():

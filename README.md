@@ -682,7 +682,7 @@ generating/inspecting the bullets table without also rendering the HTML.)
 
 | Node | Meaning |
 |---|---|
-| `fxpcn:QualitativeSummaryRun` | One per report date, at `kg:summary-run/<date>/<regime-slug>`: `fxpcn:date`, `fxpcn:llmModel` (the `litellm` model string), `fxpcn:networkName`/`fxpcn:network` (see below), and one `fxpcn:takeawayBullet` literal per bullet |
+| `fxpcn:QualitativeSummaryRun` | One per report date, at `kg:summary-run/<date>/<regime-slug>`: `fxpcn:date`, `fxpcn:llmModel` (the `litellm` model string), `fxpcn:networkName`/`fxpcn:network` (see below), one `fxpcn:takeawayBullet` literal per bullet, and one `fxpcn:mentionsPair` link per network pair mentioned anywhere in that run's bullets (see below) |
 
 Each `QualitativeSummaryRun` links to that regime's `prov:Activity` (the
 same node `export-rdf` mints — see above) via `prov:wasInformedBy`, not
@@ -700,6 +700,22 @@ register as an independent source. Without asserting it here too, a
 `graph-nexus-ask` query against just the summary graph (not merged with its
 numeric sibling in the same store) would have no way to filter or identify
 runs by network name at all.
+
+Each run also links `fxpcn:mentionsPair` to every one of the network's own
+`fxpcn:CurrencyPair`s whose exact string (e.g. `EUR/USD`) appears literally
+in any of that run's bullets — a closed-vocabulary substring check against
+the network's own pair list (carried on the bullets table alongside
+`network_name`), not free-text entity extraction, since the LLM is only
+ever prompted with this network's own pair names in the first place. A bare
+currency code (`USD` on its own, say) doesn't count as a mention — only an
+exact pair string does, which is deliberately conservative: it costs
+recall (a bullet about "dollar strength" with no pair spelled out links to
+nothing) in exchange for effectively zero false positives, the same
+trade-off the region/institution vocabulary layer made for a harder version
+of the same problem. `mentionsPair` is one triple per pair per run, not per
+bullet — bullets aren't reified as their own nodes in this ontology, so
+per-run is the finest granularity available without a larger modeling
+change.
 
 This is deliberately a second, independent `.ttl` file rather than folded
 into `export-rdf`'s output: the numeric graph must stay exportable even
