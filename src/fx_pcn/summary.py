@@ -297,6 +297,23 @@ def run(
         # comparison is False, which would silently drop `fresh` too.
         # Nothing to preserve in that case, so just keep `fresh` as-is.
         if not existing.empty:
+            # Rows from before `pairs` existed on this table (or, per
+            # `merge_incremental`'s plain `pd.concat`, rows appended back when
+            # the fresh side didn't have it yet) carry a missing/NaN `pairs`
+            # rather than a real comma-joined list. Left as-is, whichever row
+            # `export-summary-rdf` happens to read first can be one of these,
+            # and `str(nan).split(',')` -> `['nan']` blows up `_add_pairs`'s
+            # `pair.split('/')`. Backfilled from this run's own edges the same
+            # way `pipeline.run` backfills a legacy edges table's
+            # `network_name`/`pairs` -- safe here for the same reason: this
+            # output path is per-network, so every row in it (old or new) was
+            # always built from the same pair universe.
+            if 'pairs' not in existing.columns:
+                existing = existing.assign(pairs=None)
+            missing_pairs = existing['pairs'].isna()
+            if missing_pairs.any():
+                existing = existing.copy()
+                existing.loc[missing_pairs, 'pairs'] = ','.join(pairs_from_edges(edges))
             fresh = merge_incremental(existing, fresh, last_date=existing['date'].max())
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

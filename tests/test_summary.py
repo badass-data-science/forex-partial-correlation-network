@@ -223,6 +223,60 @@ def test_run_append_accumulates_across_dates(tmp_path, monkeypatch):
     assert set(result['bullet_text']) == {'Day one bullet.', 'Day two bullet.'}
 
 
+def test_run_append_backfills_legacy_missing_pairs(tmp_path, monkeypatch):
+    """A `pairs`-less/NaN row from before that column existed (or from a
+    stale `merge_incremental` concat, see summary.run) must be backfilled,
+    not left to blow up `rdf_export._add_pairs`'s `pair.split('/')` on
+    `str(nan)` down the line."""
+    output_path = tmp_path / 'bullets.parquet'
+    legacy = pd.DataFrame(
+        [
+            {
+                'date': DAY1,
+                **_RUN_PARAMS,
+                'pairs': None,
+                'model': 'some-old-model',
+                'bullet_index': 0,
+                'bullet_text': 'Legacy bullet.',
+            }
+        ],
+        columns=summary._BULLETS_TABLE_COLUMNS,
+    )
+    legacy.to_parquet(output_path)
+
+    edges_path = tmp_path / 'edges.parquet'
+    density_path = tmp_path / 'density.parquet'
+    flips_path = tmp_path / 'flips.parquet'
+    pd.DataFrame([_edges_row(date=DAY2)]).to_parquet(edges_path)
+    pd.DataFrame(
+        [
+            {
+                'date': DAY2,
+                'density': 0.6,
+                'mean_abs_partial_corr': 0.3,
+                'edge_count': 1,
+                'directed_edge_count': 1,
+                'bidirected_edge_count': 0,
+                'undirected_edge_count': 0,
+            }
+        ]
+    ).to_parquet(density_path)
+    pd.DataFrame(
+        columns=['date', 'pair_i', 'pair_j', 'previous_direction', 'new_direction']
+    ).to_parquet(flips_path)
+    monkeypatch.setattr(
+        summary,
+        '_call_llm',
+        lambda prompt, model: f'Narrative.\n\n{summary._TAKEAWAYS_HEADING}\n- Day two bullet.\n',
+    )
+
+    result = summary.run(edges_path, density_path, flips_path, output_path, append=True)
+
+    assert not result['pairs'].isna().any()
+    legacy_row = result[result['date'] == DAY1].iloc[0]
+    assert legacy_row['pairs'] == _TEST_PAIRS
+
+
 def test_run_append_skips_merge_when_existing_file_is_empty(tmp_path, monkeypatch):
     output_path = tmp_path / 'bullets.parquet'
     pd.DataFrame(columns=summary._BULLETS_TABLE_COLUMNS).to_parquet(output_path)
