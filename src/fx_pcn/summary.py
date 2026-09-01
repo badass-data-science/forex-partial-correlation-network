@@ -152,14 +152,20 @@ def _build_prompt(
         'not invent numbers not given above.',
         '',
         f'Then, on its own line, write exactly the heading "{_TAKEAWAYS_HEADING}" '
-        'followed by 3-6 bullet points (each on its own line, starting with "- "): '
-        'diversification/hedging implications of the current density and '
-        'correlation-strength regime, which relationships are worth actively '
-        'monitoring given the recent direction changes, and what would confirm or '
-        'invalidate this read going forward. Keep any actionable framing at the '
-        'level of market structure and risk monitoring -- do not give specific '
-        'trading advice (no buy/sell/position-sizing recommendations, no calls on '
-        'individual trades).',
+        'followed by 3-6 bullet points (each on its own line, starting with "- "), '
+        'covering: diversification/hedging implications of the current density and '
+        'correlation-strength regime; which relationships are worth actively '
+        'monitoring given the recent direction changes; and confirm/invalidate '
+        'conditions for this read going forward. At least 2 of the bullets must be '
+        'confirm/invalidate conditions, and each of those must follow this exact '
+        'template, with a numeric threshold on density, mean_abs_partial_corr, or '
+        'directed-edge presence/count -- using only figures given above, never '
+        'inventing new ones -- and a single integer horizon: "Confirmed if: '
+        '<condition>. Invalidated if: <condition>. Horizon: <N> windows." (one '
+        f'window = one run of this pipeline, i.e. {params["step_days"]} days). '
+        'Keep any actionable framing at the level of market structure and risk '
+        'monitoring -- do not give specific trading advice (no buy/sell/'
+        'position-sizing recommendations, no calls on individual trades).',
     ]
     return '\n'.join(lines)
 
