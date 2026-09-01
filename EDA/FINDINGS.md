@@ -23,6 +23,52 @@ right-skewed, max 13. Unprompted top bursts (13, 13, 11, 10 flips) landed on
 2020-03-16/03-23 (COVID crash), 2020-05-18, 2020-02-03 -- a good sign the
 tail isn't noise.
 
+### Methodology note: placebo tests
+
+Three different placebo tests show up below, each guarding against a
+different way a Granger-causality (or other) result can lie. The shared
+principle: build a null distribution by running the exact same test on data
+engineered to have *no* real causal relationship, then check whether the
+real result is more extreme than anything that null distribution produces.
+If it is, the effect is real. If the real result looks like a typical draw
+from that null, it's spurious.
+
+- **Shuffled-label placebo.** Used on the FOMC dummy variable
+  (`is_statement`), which is sparse -- mostly zeros, a handful of 1s
+  scattered through ~600 weeks. Concern: does a rare binary regressor with
+  many lags just mechanically produce extreme p-values regardless of which
+  specific days are marked 1? Mechanism: randomly relabel which days count
+  as "statement days" (same count of 1s, scrambled positions), rerun the
+  test, repeat 200 times, take the best (most significant) result across
+  all lags each time to build a null distribution. If the real dates' result
+  doesn't clear that null, the "signal" was just an artifact of sparsity.
+
+- **Reverse-direction placebo.** Used on the FOMC test, and the one that
+  actually killed it. FOMC statement dates are scheduled years in advance,
+  so it is logically impossible for the network's flip count to *cause*
+  them. Mechanism: run the Granger test backwards
+  (`flip_count -> is_statement` instead of `is_statement -> flip_count`).
+  True causality in that direction must be zero. If it instead comes back
+  significant -- especially as significant as, or more significant than,
+  the forward direction -- that's the standard smoking gun for a shared
+  confound (here, FOMC's rigid ~6-week meeting cadence) rather than one
+  series actually driving the other.
+
+- **Circular-shift placebo.** Used on the VIX lead/lag test. VIX is a
+  smooth, autocorrelated series, so a naive shuffle would destroy its own
+  week-to-week structure and wouldn't be a fair comparison. Mechanism:
+  rotate the real VIX series by a random number of steps (`np.roll`) --
+  this keeps all of VIX's own autocorrelation and dynamics intact (it's
+  still "real" VIX behavior) but misaligns it in time from the real
+  flip_count series. Rerun the forward Granger test across many random
+  shifts to build the null distribution. If the correctly-timed alignment
+  beats every shifted version, the timing relationship (not just each
+  series' own structure) is what's producing the result.
+
+The general lesson: a raw Granger-causality p-value alone is close to
+meaningless -- it's only trustworthy once the same pipeline, run on data
+built to have no real effect, fails to produce something just as extreme.
+
 ### FOMC calendar -- REJECTED
 
 Cross-checked burst dates against the FOMC statement/minutes release
